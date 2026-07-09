@@ -16,7 +16,7 @@ if "area_col_atual" not in st.session_state:
 if "modo_atual" not in st.session_state:
     st.session_state.modo_atual = None
 
-st.title("📍 Mapa Monitor de Saúde - Rastreamento Territorial")
+st.title("📍 Dashboard de Saúde - Rastreamento Territorial")
 st.markdown("Envie uma planilha com endereços ou coordenadas para visualizar os pacientes no mapa.")
 
 uploaded_file = st.file_uploader("Escolha sua planilha (Excel ou CSV)", type=["xlsx", "csv"])
@@ -76,18 +76,13 @@ if uploaded_file:
             value="Porto Feliz, São Paulo, Brasil"
         )
 
-        limite = st.number_input(
-            "Quantidade máxima de linhas para converter",
-            min_value=1,
-            max_value=int(len(df)),
-            value=min(20, int(len(df)))
-        )
+        st.caption(f"A conversão vai processar todas as {len(df)} linhas da planilha por padrão.")
 
         if st.button("Converter endereços"):
             if not endereco_col:
                 st.error("Selecione a coluna de endereço.")
             else:
-                df_geo = df.copy().head(int(limite))
+                df_geo = df.copy()
                 geolocator = Nominatim(user_agent="mapa_saude_porto_feliz_streamlit")
                 geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
 
@@ -164,7 +159,7 @@ if uploaded_file:
             centro_lat = df_mapa_final["latitude"].mean()
             centro_lon = df_mapa_final["longitude"].mean()
             mapa = folium.Map(location=[centro_lat, centro_lon], zoom_start=13)
-            cores = ["red", "blue", "green", "yellow", "orange", "darkred", "purple"]
+            cores = ["red", "blue", "green", "purple", "orange", "darkred"]
             area_col = st.session_state.area_col_atual
 
             for _, row in df_mapa_final.iterrows():
