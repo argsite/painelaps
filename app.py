@@ -16,7 +16,7 @@ if "area_col_atual" not in st.session_state:
 if "modo_atual" not in st.session_state:
     st.session_state.modo_atual = None
 
-st.title("📍 Dashboard de Saúde - Rastreamento Territorial")
+st.title("📍 Mapa Monitor de Saúde - Rastreamento Territorial")
 st.markdown("Envie uma planilha com endereços ou coordenadas para visualizar os pacientes no mapa.")
 
 uploaded_file = st.file_uploader("Escolha sua planilha (Excel ou CSV)", type=["xlsx", "csv"])
@@ -77,7 +77,7 @@ if uploaded_file:
         )
 
         limite = st.number_input(
-            "Quantidade máxima de linhas para converter neste teste",
+            "Quantidade máxima de linhas para converter",
             min_value=1,
             max_value=int(len(df)),
             value=min(20, int(len(df)))
@@ -164,7 +164,7 @@ if uploaded_file:
             centro_lat = df_mapa_final["latitude"].mean()
             centro_lon = df_mapa_final["longitude"].mean()
             mapa = folium.Map(location=[centro_lat, centro_lon], zoom_start=13)
-            cores = ["red", "blue", "green", "purple", "orange", "darkred"]
+            cores = ["red", "blue", "green", "yellow", "orange", "darkred", "purple"]
             area_col = st.session_state.area_col_atual
 
             for _, row in df_mapa_final.iterrows():
