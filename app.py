@@ -1,6 +1,7 @@
 
 import streamlit as st
 import pandas as pd
+from io import BytesIO
 import plotly.express as px
 import folium
 from streamlit_folium import st_folium
@@ -79,6 +80,25 @@ def grafico_barras(df, x, y, titulo, cor=None):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def construir_mapa(dados, lat_col, lon_col, nome_col, endereco_col, area_col):
+    centro = [dados[lat_col].mean(), dados[lon_col].mean()]
+    mapa = folium.Map(location=centro, zoom_start=13)
+    cores = ["red", "blue", "green", "purple", "orange", "darkred", "cadetblue", "darkgreen"]
+    for _, row in dados.iterrows():
+        cor = "gray"
+        if area_col and area_col in dados.columns:
+            cor = cores[hash(str(row.get(area_col, ""))) % len(cores)]
+        popup = f"Paciente: {row.get(nome_col, 'N/A')}<br>Endereço: {row.get(endereco_col, 'N/A')}<br>Microárea: {row.get(area_col, 'N/A')}"
+        tooltip = f"{row.get(nome_col, 'N/A')} - {row.get(area_col, 'N/A')}"
+        folium.Marker(
+            location=[row[lat_col], row[lon_col]],
+            popup=popup,
+            tooltip=tooltip,
+            icon=folium.Icon(color=cor),
+        ).add_to(mapa)
+    return mapa
+
+
 def converter_enderecos(df, col_endereco, col_lat, col_lon):
     geolocator = Nominatim(user_agent="dashboard_aps_porto_feliz")
     geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
@@ -108,6 +128,14 @@ def converter_enderecos(df, col_endereco, col_lat, col_lon):
 
     status.write("Conversão de endereços concluída.")
     return df
+
+
+def dataframe_para_excel_bytes(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Dados")
+    output.seek(0)
+    return output.getvalue()
 
 
 def render_mapa(df, titulo_secao):
@@ -150,38 +178,49 @@ def render_mapa(df, titulo_secao):
 
     df_mapa = st.session_state.get(f"df_mapa_{titulo_secao}", df_mapa)
 
+    if "Latitude" in df_mapa.columns and "Longitude" in df_mapa.columns:
+        arquivo_excel = dataframe_para_excel_bytes(df_mapa)
+        st.download_button(
+            label="Baixar planilha geocodificada",
+            data=arquivo_excel,
+            file_name=f"{titulo_secao.lower()}_geocodificada.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"download_geo_{titulo_secao}",
+        )
+
     if st.button("Gerar mapa", key=f"gerar_{titulo_secao}"):
         if lat_col not in df_mapa.columns or lon_col not in df_mapa.columns:
             st.error("Não encontrei as colunas de latitude e longitude. Marque a opção de conversão ou selecione colunas válidas.")
-            return
+        else:
+            dados = df_mapa.copy()
+            dados[lat_col] = pd.to_numeric(dados[lat_col], errors="coerce")
+            dados[lon_col] = pd.to_numeric(dados[lon_col], errors="coerce")
+            dados = dados.dropna(subset=[lat_col, lon_col])
 
-        dados = df_mapa.copy()
-        dados[lat_col] = pd.to_numeric(dados[lat_col], errors="coerce")
-        dados[lon_col] = pd.to_numeric(dados[lon_col], errors="coerce")
-        dados = dados.dropna(subset=[lat_col, lon_col])
+            if dados.empty:
+                st.error("Nenhum registro com latitude e longitude válidas foi encontrado.")
+            else:
+                st.session_state[f"dados_mapa_{titulo_secao}"] = dados
+                st.session_state[f"config_mapa_{titulo_secao}"] = {
+                    "lat_col": lat_col,
+                    "lon_col": lon_col,
+                    "nome_col": nome_col,
+                    "endereco_col": endereco_col,
+                    "area_col": area_col,
+                }
+                st.success("Mapa gerado com sucesso.")
 
-        if dados.empty:
-            st.error("Nenhum registro com latitude e longitude válidas foi encontrado.")
-            return
-
-        centro = [dados[lat_col].mean(), dados[lon_col].mean()]
-        mapa = folium.Map(location=centro, zoom_start=13)
-        cores = ["red", "blue", "green", "purple", "orange", "darkred", "cadetblue", "darkgreen"]
-
-        for _, row in dados.iterrows():
-            cor = "gray"
-            if area_col and area_col in dados.columns:
-                cor = cores[hash(str(row.get(area_col, ""))) % len(cores)]
-            popup = f"Paciente: {row.get(nome_col, 'N/A')}<br>Endereço: {row.get(endereco_col, 'N/A')}<br>Microárea: {row.get(area_col, 'N/A')}"
-            tooltip = f"{row.get(nome_col, 'N/A')} - {row.get(area_col, 'N/A')}"
-            folium.Marker(
-                location=[row[lat_col], row[lon_col]],
-                popup=popup,
-                tooltip=tooltip,
-                icon=folium.Icon(color=cor),
-            ).add_to(mapa)
-
-        st.success("Mapa gerado com sucesso.")
+    dados_salvos = st.session_state.get(f"dados_mapa_{titulo_secao}")
+    cfg = st.session_state.get(f"config_mapa_{titulo_secao}")
+    if dados_salvos is not None and cfg is not None and not dados_salvos.empty:
+        mapa = construir_mapa(
+            dados_salvos,
+            cfg["lat_col"],
+            cfg["lon_col"],
+            cfg["nome_col"],
+            cfg["endereco_col"],
+            cfg["area_col"],
+        )
         st_folium(mapa, width=None, height=650)
 
 
