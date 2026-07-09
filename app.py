@@ -18,6 +18,8 @@ if "modo_atual" not in st.session_state:
     st.session_state.modo_atual = None
 if "tipo_mapa" not in st.session_state:
     st.session_state.tipo_mapa = "MarkerCluster"
+if "nome_col_atual" not in st.session_state:
+    st.session_state.nome_col_atual = None
 
 st.title("📍 Dashboard de Saúde - Rastreamento Territorial")
 st.markdown("Envie uma planilha com endereços ou coordenadas para visualizar os pacientes no mapa.")
@@ -47,8 +49,10 @@ if uploaded_file:
     if modo == "Usar latitude/longitude já existentes":
         lat_col = st.selectbox("Selecione a coluna de Latitude", cols, index=None)
         lon_col = st.selectbox("Selecione a coluna de Longitude", cols, index=None)
+        nome_col = st.selectbox("Selecione a coluna com o nome do paciente (opcional)", [None] + cols)
         area_col = st.selectbox("Selecione a coluna de Microárea (opcional)", [None] + cols)
         st.session_state.area_col_atual = area_col
+        st.session_state.nome_col_atual = nome_col
 
         tipo_mapa = st.radio(
             "Tipo de visualização do mapa",
@@ -78,8 +82,10 @@ if uploaded_file:
 
     else:
         endereco_col = st.selectbox("Selecione a coluna com o endereço completo", cols, index=None)
+        nome_col = st.selectbox("Selecione a coluna com o nome do paciente (opcional)", [None] + cols)
         area_col = st.selectbox("Selecione a coluna de Microárea (opcional)", [None] + cols)
         st.session_state.area_col_atual = area_col
+        st.session_state.nome_col_atual = nome_col
 
         tipo_mapa = st.radio(
             "Tipo de visualização do mapa",
@@ -163,7 +169,7 @@ if uploaded_file:
             st.download_button(
                 label="Baixar planilha com latitude e longitude (CSV)",
                 data=csv,
-                file_name="enderecos_geocodificados.csv",
+                file_name="enderecos_geocificados.csv",
                 mime="text/csv"
             )
 
@@ -177,6 +183,7 @@ if uploaded_file:
             centro_lon = df_mapa_final["longitude"].mean()
             mapa = folium.Map(location=[centro_lat, centro_lon], zoom_start=13)
             area_col = st.session_state.area_col_atual
+            nome_col = st.session_state.nome_col_atual
             tipo_mapa = st.session_state.tipo_mapa
             cores = ["red", "blue", "green", "purple", "orange", "darkred"]
 
@@ -189,15 +196,27 @@ if uploaded_file:
                         idx = hash(str(row[area_col])) % len(cores)
                         cor = cores[idx]
 
+                    nome_paciente = row.get(nome_col, "Sem nome") if nome_col else "Sem nome"
+                    microarea = row.get(area_col, "N/A") if area_col else "N/A"
+                    endereco_encontrado = row.get("endereco_encontrado", "N/A")
+
+                    popup_html = f"""
+                    <b>Paciente:</b> {nome_paciente}<br>
+                    <b>Microárea:</b> {microarea}<br>
+                    <b>Latitude:</b> {row['latitude']}<br>
+                    <b>Longitude:</b> {row['longitude']}<br>
+                    <b>Endereço encontrado:</b> {endereco_encontrado}
+                    """
+
                     folium.Marker(
                         location=[row["latitude"], row["longitude"]],
-                        popup=f"Paciente: {row.get('Paciente', 'N/A')}",
-                        tooltip=f"Microárea: {row.get(area_col, 'N/A') if area_col else 'N/A'}",
+                        popup=folium.Popup(popup_html, max_width=300),
+                        tooltip=str(nome_paciente),
                         icon=folium.Icon(color=cor)
                     ).add_to(marker_cluster)
 
                 st.write("### Mapa")
-                st.caption("Visualização em marcadores agrupados para facilitar a navegação.")
+                st.caption("Visualização em marcadores agrupados. Clique no ponto para ver nome do paciente e detalhes.")
 
             else:
                 heat_data = df_mapa_final[["latitude", "longitude"]].dropna().values.tolist()
