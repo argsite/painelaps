@@ -214,8 +214,17 @@ def preparar_lista_nominal_inteligente(df, linha_cuidado, m):
 
 def construir_mapa(dados, lat_col, lon_col, nome_col, endereco_col, area_col, modo_mapa="Agrupado"):
     centro = [dados[lat_col].mean(), dados[lon_col].mean()]
-    mapa = folium.Map(location=centro, zoom_start=13)
-    cores = ["red", "blue", "green", "purple", "orange", "darkred", "cadetblue", "darkgreen"]
+    mapa = folium.Map(location=centro, zoom_start=13, tiles="CartoDB Positron")
+    estilos = {
+        "Sem pendências": {"cor": "#dbeafe", "borda": "#60a5fa", "emoji": "✅"},
+        "Sem visita": {"cor": "#ffedd5", "borda": "#fb923c", "emoji": "🏠"},
+        "Não acompanhado": {"cor": "#fee2e2", "borda": "#f87171", "emoji": "👥"},
+        "Sem consulta": {"cor": "#f3e8ff", "borda": "#c084fc", "emoji": "🩺"},
+        "Sem PA": {"cor": "#dcfce7", "borda": "#4ade80", "emoji": "💚"},
+        "Cadastro desatualizado": {"cor": "#e0f2fe", "borda": "#38bdf8", "emoji": "📝"},
+        "Sem HbA1c": {"cor": "#ede9fe", "borda": "#a78bfa", "emoji": "🧪"},
+        "Sem avaliação dos pés": {"cor": "#ccfbf1", "borda": "#2dd4bf", "emoji": "🦶"},
+    }
 
     if modo_mapa == "Calor":
         pontos = dados[[lat_col, lon_col]].dropna().values.tolist()
@@ -226,16 +235,23 @@ def construir_mapa(dados, lat_col, lon_col, nome_col, endereco_col, area_col, mo
     camada = MarkerCluster().add_to(mapa) if modo_mapa == "Agrupado" else mapa
 
     for _, row in dados.iterrows():
-        cor = "gray"
-        if area_col and area_col in dados.columns:
-            cor = cores[hash(str(row.get(area_col, ""))) % len(cores)]
-        popup = f"Paciente: {row.get(nome_col, 'N/A')}<br>Endereço: {row.get(endereco_col, 'N/A')}<br>Microárea: {row.get(area_col, 'N/A')}"
-        tooltip = f"{row.get(nome_col, 'N/A')} - {row.get(area_col, 'N/A')}"
+        principal = row.get("pendencia_principal", "Sem pendências")
+        estilo = estilos.get(principal, estilos["Sem pendências"])
+        popup = (
+            f"<div style='font-size:13px;line-height:1.45;'>"
+            f"<b>{row.get(nome_col, 'N/A')}</b><br>"
+            f"Endereço: {row.get(endereco_col, 'N/A')}<br>"
+            f"Microárea: {row.get(area_col, 'N/A')}<br>"
+            f"Pendência principal: {principal}"
+            f"</div>"
+        )
+        tooltip = f"{row.get(nome_col, 'N/A')} - {principal}"
+        icone_html = f"<div style='display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;background:{estilo['cor']};border:2px solid {estilo['borda']};box-shadow:0 1px 4px rgba(15,23,42,.12);font-size:13px;'>{estilo['emoji']}</div>"
         folium.Marker(
             location=[row[lat_col], row[lon_col]],
             popup=popup,
             tooltip=tooltip,
-            icon=folium.Icon(color=cor),
+            icon=folium.DivIcon(html=icone_html),
         ).add_to(camada)
     return mapa
 
@@ -289,6 +305,71 @@ def dataframe_para_excel_bytes(df):
     return output.getvalue()
 
 
+def aplicar_filtros_pendencia_mapa(df: pd.DataFrame, titulo_secao: str):
+    st.markdown("### Filtros do mapa territorial")
+    visao = st.radio(
+        "Exibição no mapa",
+        ["Todos os pacientes", "Somente com pendências"],
+        horizontal=True,
+        key=f"visao_pend_{titulo_secao}",
+    )
+
+    opcoes = ["Sem visita", "Não acompanhado", "Sem consulta", "Sem PA", "Cadastro desatualizado"]
+    if titulo_secao.lower() == "diabetes":
+        opcoes += ["Sem HbA1c", "Sem avaliação dos pés"]
+
+    selecionadas = st.multiselect(
+        "Tipo de pendência",
+        opcoes,
+        key=f"tipos_pend_{titulo_secao}",
+        help="Você pode deixar vazio para ver todos, ou escolher uma ou mais pendências específicas.",
+    )
+
+    filtrado = df.copy()
+    cols_existentes = [c for c in opcoes if c in filtrado.columns]
+    if visao == "Somente com pendências" and cols_existentes:
+        filtrado = filtrado[filtrado[cols_existentes].any(axis=1)]
+    if selecionadas:
+        sel_existentes = [c for c in selecionadas if c in filtrado.columns]
+        if sel_existentes:
+            filtrado = filtrado[filtrado[sel_existentes].any(axis=1)]
+    return filtrado, selecionadas
+
+
+def pendencia_principal(row: pd.Series, titulo_secao: str):
+    ordem = [
+        "Sem visita",
+        "Não acompanhado",
+        "Sem consulta",
+        "Sem PA",
+        "Cadastro desatualizado",
+    ]
+    if titulo_secao.lower() == "diabetes":
+        ordem += ["Sem HbA1c", "Sem avaliação dos pés"]
+    for item in ordem:
+        if item in row.index and bool(row.get(item, False)):
+            return item
+    return "Sem pendências"
+
+
+def legenda_pendencias(titulo_secao: str):
+    itens = [
+        ("#dbeafe", "Sem pendências"),
+        ("#ffedd5", "Sem visita"),
+        ("#fee2e2", "Não acompanhado"),
+        ("#f3e8ff", "Sem consulta"),
+        ("#dcfce7", "Sem PA"),
+        ("#e0f2fe", "Cadastro desatualizado"),
+    ]
+    if titulo_secao.lower() == "diabetes":
+        itens += [("#ede9fe", "Sem HbA1c"), ("#ccfbf1", "Sem avaliação dos pés")]
+    html = ['<div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px 0;">']
+    for cor, rotulo in itens:
+        html.append(f'<div style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e5e7eb;border-radius:999px;padding:6px 10px;font-size:0.85rem;color:#334155;"><span style="width:12px;height:12px;border-radius:999px;background:{cor};border:1px solid rgba(15,23,42,.08);display:inline-block;"></span>{rotulo}</div>')
+    html.append('</div>')
+    st.markdown(''.join(html), unsafe_allow_html=True)
+
+
 def render_mapa(df, titulo_secao):
     st.subheader(f"Mapa territorial - {titulo_secao}")
     cols = df.columns.tolist()
@@ -307,6 +388,20 @@ def render_mapa(df, titulo_secao):
         area_col = st.selectbox("Microárea", cols, index=area_default, key=f"micro_{titulo_secao}")
 
     df_mapa = st.session_state.get(f"df_mapa_{titulo_secao}", df_mapa)
+
+    dados_prontos = st.session_state.get(f"dados_mapa_{titulo_secao}")
+    config_pronta = st.session_state.get(f"config_mapa_{titulo_secao}")
+    if dados_prontos is not None and config_pronta is not None and not dados_prontos.empty:
+        st.success(f"Mapa preparado com {len(dados_prontos)} registros geocodificados.")
+        st.caption("Visualização atualizada automaticamente após a conversão dos endereços.")
+        nome_col_mapa = config_pronta["nome_col"]
+        endereco_col_mapa = config_pronta["endereco_col"]
+        area_col_mapa = config_pronta["area_col"]
+        st.dataframe(
+            dados_prontos[[c for c in [nome_col_mapa, endereco_col_mapa, area_col_mapa, "Latitude", "Longitude"] if c in dados_prontos.columns]].head(10),
+            use_container_width=True,
+        )
+
     ja_tem_coordenadas = "Latitude" in df_mapa.columns and "Longitude" in df_mapa.columns
 
     lat_options = ["Latitude"] + [c for c in cols if c != "Latitude"]
@@ -335,8 +430,22 @@ def render_mapa(df, titulo_secao):
             try:
                 df_convertido = converter_enderecos(df_mapa, endereco_col, "Latitude", "Longitude")
                 st.session_state[f"df_mapa_{titulo_secao}"] = df_convertido
-                st.success("Conversão concluída. As colunas Latitude e Longitude foram preparadas.")
-                st.rerun()
+                lat_col = "Latitude"
+                lon_col = "Longitude"
+                dados = df_convertido.copy()
+                dados[lat_col] = pd.to_numeric(dados[lat_col], errors="coerce")
+                dados[lon_col] = pd.to_numeric(dados[lon_col], errors="coerce")
+                dados = dados.dropna(subset=[lat_col, lon_col])
+                st.session_state[f"dados_mapa_{titulo_secao}"] = dados
+                st.session_state[f"config_mapa_{titulo_secao}"] = {
+                    "lat_col": lat_col,
+                    "lon_col": lon_col,
+                    "nome_col": nome_col,
+                    "endereco_col": endereco_col,
+                    "area_col": area_col,
+                    "modo_mapa": modo_mapa,
+                }
+                st.success(f"Conversão concluída. {len(dados)} registros com coordenadas válidas foram preparados no mapa.")
             except Exception as e:
                 st.error(f"Erro na conversão de endereços: {e}")
 
@@ -345,8 +454,22 @@ def render_mapa(df, titulo_secao):
             base_sem_geo = df.copy()
             df_convertido = converter_enderecos(base_sem_geo, endereco_col, "Latitude", "Longitude")
             st.session_state[f"df_mapa_{titulo_secao}"] = df_convertido
-            st.success("Conversão refeita com sucesso.")
-            st.rerun()
+            lat_col = "Latitude"
+            lon_col = "Longitude"
+            dados = df_convertido.copy()
+            dados[lat_col] = pd.to_numeric(dados[lat_col], errors="coerce")
+            dados[lon_col] = pd.to_numeric(dados[lon_col], errors="coerce")
+            dados = dados.dropna(subset=[lat_col, lon_col])
+            st.session_state[f"dados_mapa_{titulo_secao}"] = dados
+            st.session_state[f"config_mapa_{titulo_secao}"] = {
+                "lat_col": lat_col,
+                "lon_col": lon_col,
+                "nome_col": nome_col,
+                "endereco_col": endereco_col,
+                "area_col": area_col,
+                "modo_mapa": modo_mapa,
+            }
+            st.success(f"Reconversão concluída. {len(dados)} registros com coordenadas válidas foram preparados no mapa.")
         except Exception as e:
             st.error(f"Erro na reconversão de endereços: {e}")
 
@@ -362,7 +485,11 @@ def render_mapa(df, titulo_secao):
             key=f"download_geo_{titulo_secao}",
         )
 
-    if st.button("Gerar mapa", key=f"gerar_{titulo_secao}"):
+    gerar_agora = st.button("Gerar mapa", key=f"gerar_{titulo_secao}")
+    if not gerar_agora and dados_prontos is not None and config_pronta is not None and not dados_prontos.empty:
+        gerar_agora = True
+
+    if gerar_agora:
         if lat_col not in df_mapa.columns or lon_col not in df_mapa.columns:
             st.error("Não encontrei as colunas de latitude e longitude. Marque a opção de conversão ou selecione colunas válidas.")
         else:
@@ -388,16 +515,23 @@ def render_mapa(df, titulo_secao):
     dados_salvos = st.session_state.get(f"dados_mapa_{titulo_secao}")
     cfg = st.session_state.get(f"config_mapa_{titulo_secao}")
     if dados_salvos is not None and cfg is not None and not dados_salvos.empty:
-        mapa = construir_mapa(
-            dados_salvos,
-            cfg["lat_col"],
-            cfg["lon_col"],
-            cfg["nome_col"],
-            cfg["endereco_col"],
-            cfg["area_col"],
-            cfg.get("modo_mapa", "Agrupado"),
-        )
-        st_folium(mapa, width=None, height=650)
+        dados_filtrados, _ = aplicar_filtros_pendencia_mapa(dados_salvos, titulo_secao)
+        if dados_filtrados.empty:
+            st.info("Nenhum paciente encontrado para os filtros de pendência selecionados.")
+        else:
+            dados_filtrados = dados_filtrados.copy()
+            dados_filtrados["pendencia_principal"] = dados_filtrados.apply(lambda row: pendencia_principal(row, titulo_secao), axis=1)
+            legenda_pendencias(titulo_secao)
+            mapa = construir_mapa(
+                dados_filtrados,
+                cfg["lat_col"],
+                cfg["lon_col"],
+                cfg["nome_col"],
+                cfg["endereco_col"],
+                cfg["area_col"],
+                cfg.get("modo_mapa", "Agrupado"),
+            )
+            st_folium(mapa, width=None, height=650)
 
 
 def preparar_diabetes(df):
