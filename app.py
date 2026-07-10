@@ -721,7 +721,7 @@ def render_diabetes(df):
     c1, c2 = st.columns(2)
     with c1:
         g1 = filtrado.groupby(m["micro"], dropna=False)["Não acompanhado"].sum().reset_index().sort_values("Não acompanhado", ascending=False)
-        grafico_barras(g1, m["micro"], "Não acompanhado", "Não acompanhados por microárea")
+        grafico_barras(g1, m["micro"], "Prioridade Alta", "Prioridade alta por microárea")
     with c2:
         pend = pd.DataFrame({
             "Indicador": ["Sem consulta", "Sem PA", "Sem HbA1c", "Sem avaliação dos pés"],
@@ -848,4 +848,3 @@ else:
             render_diabetes(df)
     except Exception as e:
         st.error(f"Não foi possível processar a planilha: {e}")
- 
