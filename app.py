@@ -12,33 +12,65 @@ from geopy.extra.rate_limiter import RateLimiter
 st.set_page_config(layout="wide", page_title="Dashboard APS - Hipertensão e Diabetes")
 st.markdown("""
 <style>
-div[data-testid="metric-container"] {
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin: 0.5rem 0 1rem 0;
+}
+.metric-card {
+    border-radius: 16px;
     padding: 14px 16px;
-    border-radius: 14px;
-    min-height: 112px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
-div[data-testid="metric-container"] label {
-    white-space: normal !important;
-    overflow: visible !important;
+.metric-card__label {
+    font-size: 0.92rem;
+    line-height: 1.25;
+    color: #334155;
+    margin-bottom: 10px;
+    min-height: 2.5em;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
 }
-div[data-testid="metric-container"] [data-testid="stMetricLabel"] {
-    white-space: normal !important;
-    overflow: visible !important;
+.metric-card__icon {
+    font-size: 1rem;
+    line-height: 1.1;
+    opacity: 0.85;
 }
-div[data-testid="metric-container"] [data-testid="stMetricLabel"] p {
-    white-space: normal !important;
-    overflow: visible !important;
-    text-overflow: unset !important;
-    font-size: 0.95rem !important;
-    line-height: 1.2 !important;
-    min-height: 2.4em;
+.metric-card__value {
+    font-size: clamp(1.65rem, 2.6vw, 2.2rem);
+    font-weight: 700;
+    line-height: 1.05;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+    word-break: break-word;
 }
-div[data-testid="metric-container"] [data-testid="stMetricValue"] {
-    font-size: 2rem !important;
-    line-height: 1.1 !important;
+.metric-total { background: #f8fafc; }
+.metric-consulta { background: #eff6ff; }
+.metric-pa { background: #f0fdf4; }
+.metric-visita { background: #fff7ed; }
+.metric-cadastro { background: #f5f3ff; }
+.metric-acomp { background: #fdf2f8; }
+.metric-hba1c { background: #eef2ff; }
+.metric-pes { background: #f0fdfa; }
+@media (max-width: 640px) {
+    .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .metric-card {
+        padding: 12px 12px;
+        border-radius: 14px;
+    }
+    .metric-card__label {
+        font-size: 0.84rem;
+        min-height: 2.8em;
+    }
+    .metric-card__value {
+        font-size: 1.7rem;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -99,13 +131,24 @@ def aplicar_filtros_base(df, col_equipe, col_micro, col_prioridade):
 
 
 def exibir_metricas(cards):
-    n = len(cards)
-    if n <= 4:
-        cols = st.columns(n)
-    else:
-        cols = st.columns(3)
-    for i, (titulo, valor) in enumerate(cards):
-        cols[i % len(cols)].metric(titulo, valor)
+    estilos = {
+        "Total": ("metric-total", "👥"),
+        "Consulta": ("metric-consulta", "🩺"),
+        "PA": ("metric-pa", "💚"),
+        "PA aferida": ("metric-pa", "💚"),
+        "Com visita": ("metric-visita", "🏠"),
+        "Cadastro atualizado": ("metric-cadastro", "📝"),
+        "Acompanhados": ("metric-acomp", "🤝"),
+        "HbA1c": ("metric-hba1c", "🧪"),
+        "Pés": ("metric-pes", "🦶"),
+    }
+    html = ['<div class="metric-grid">']
+    for titulo, valor in cards:
+        classe, icone = estilos.get(titulo, ("metric-total", "•"))
+        card_html = f'<div class="metric-card {classe}"><div class="metric-card__label"><span class="metric-card__icon">{icone}</span><span>{titulo}</span></div><div class="metric-card__value">{valor}</div></div>'
+        html.append(card_html)
+    html.append('</div>')
+    st.markdown(''.join(html), unsafe_allow_html=True)
 
 
 def grafico_barras(df, x, y, titulo, cor=None):
