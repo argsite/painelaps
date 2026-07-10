@@ -10,6 +10,38 @@ from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 
 st.set_page_config(layout="wide", page_title="Dashboard APS - Hipertensão e Diabetes")
+st.markdown("""
+<style>
+div[data-testid="metric-container"] {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    padding: 14px 16px;
+    border-radius: 14px;
+    min-height: 112px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+div[data-testid="metric-container"] label {
+    white-space: normal !important;
+    overflow: visible !important;
+}
+div[data-testid="metric-container"] [data-testid="stMetricLabel"] {
+    white-space: normal !important;
+    overflow: visible !important;
+}
+div[data-testid="metric-container"] [data-testid="stMetricLabel"] p {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    font-size: 0.95rem !important;
+    line-height: 1.2 !important;
+    min-height: 2.4em;
+}
+div[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    font-size: 2rem !important;
+    line-height: 1.1 !important;
+}
+</style>
+""", unsafe_allow_html=True)
 st.title("Dashboard APS - Hipertensão e Diabetes")
 st.caption("Painel para acompanhamento territorial, busca ativa e monitoramento por equipe e microárea.")
 
@@ -67,9 +99,13 @@ def aplicar_filtros_base(df, col_equipe, col_micro, col_prioridade):
 
 
 def exibir_metricas(cards):
-    cols = st.columns(len(cards))
-    for col, (titulo, valor) in zip(cols, cards):
-        col.metric(titulo, valor)
+    n = len(cards)
+    if n <= 4:
+        cols = st.columns(n)
+    else:
+        cols = st.columns(3)
+    for i, (titulo, valor) in enumerate(cards):
+        cols[i % len(cols)].metric(titulo, valor)
 
 
 def grafico_barras(df, x, y, titulo, cor=None):
