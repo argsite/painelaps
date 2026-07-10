@@ -716,6 +716,7 @@ def render_diabetes(df):
         ("HbA1c", pct(m["hba1c"])),
         ("Sem HbA1c", sem_hba1c),
         ("Pés", pct(m["pes"])),
+        ("Cadastro atualizado", pct(m["cadastro"])),
         ("Com visita", pct_visita),
     ])
     c1, c2 = st.columns(2)
