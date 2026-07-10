@@ -1,6 +1,7 @@
 
 import streamlit as st
 import pandas as pd
+import io
 from io import BytesIO
 import plotly.express as px
 import folium
@@ -79,9 +80,23 @@ st.caption("Painel para acompanhamento territorial, busca ativa e monitoramento 
 
 
 def carregar_planilha(uploaded_file):
-    if uploaded_file.name.lower().endswith((".xlsx", ".xls")):
-        return pd.read_excel(uploaded_file)
-    return pd.read_csv(uploaded_file)
+    nome = uploaded_file.name.lower()
+    conteudo = uploaded_file.getvalue()
+
+    if nome.endswith('.xlsx'):
+        return pd.read_excel(io.BytesIO(conteudo), engine='openpyxl')
+
+    if nome.endswith('.xls'):
+        try:
+            return pd.read_excel(io.BytesIO(conteudo), engine='xlrd')
+        except ImportError:
+            st.warning("Arquivo .xls detectado, mas o ambiente não possui xlrd. Tente salvar a planilha como .xlsx e enviar novamente.")
+            raise ValueError("Arquivo .xls não suportado neste ambiente sem xlrd. Salve como .xlsx e tente novamente.")
+
+    try:
+        return pd.read_csv(io.BytesIO(conteudo))
+    except UnicodeDecodeError:
+        return pd.read_csv(io.BytesIO(conteudo), encoding='latin1', sep=None, engine='python')
 
 
 def normalizar_colunas(df):
