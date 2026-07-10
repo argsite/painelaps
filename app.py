@@ -79,6 +79,41 @@ st.title("Dashboard APS - Hipertensão e Diabetes")
 st.caption("Painel para acompanhamento territorial, busca ativa e monitoramento por equipe e microárea.")
 
 
+def detectar_linha_cuidado(df: pd.DataFrame, nome_arquivo: str = ""):
+    colunas = {str(c).strip().lower() for c in df.columns}
+    nome = (nome_arquivo or "").lower()
+
+    pontos_diabetes = 0
+    pontos_hipertensao = 0
+
+    chaves_diabetes = ["hba1c", "hemoglobina glicada", "pés", "pes", "diabetes"]
+    chaves_hipertensao = ["hipertens", "pressão arterial", "pressao arterial", "pa aferida"]
+
+    for chave in chaves_diabetes:
+        if any(chave in c for c in colunas) or chave in nome:
+            pontos_diabetes += 1
+    for chave in chaves_hipertensao:
+        if any(chave in c for c in colunas) or chave in nome:
+            pontos_hipertensao += 1
+
+    if pontos_diabetes > pontos_hipertensao:
+        return "Diabetes", "automática"
+    if pontos_hipertensao > pontos_diabetes:
+        return "Hipertensão", "automática"
+    return None, "indefinida"
+
+
+def exibir_cabecalho_analise(linha_cuidado: str, origem: str):
+    selo = "Detectado automaticamente" if origem == "automática" else "Definido manualmente"
+    st.markdown(f"""
+    <div style='background:#f8fafc;border:1px solid #e5e7eb;border-radius:16px;padding:16px 18px;margin:8px 0 14px 0;'>
+        <div style='font-size:0.82rem;color:#64748b;font-weight:600;letter-spacing:.02em;text-transform:uppercase;margin-bottom:6px;'>Análise do relatório</div>
+        <div style='font-size:1.35rem;font-weight:700;color:#0f172a;margin-bottom:4px;'>Linha de cuidado: {linha_cuidado}</div>
+        <div style='font-size:0.95rem;color:#475569;'>{selo}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def carregar_planilha(uploaded_file):
     nome = uploaded_file.name.lower()
     conteudo = uploaded_file.getvalue()
