@@ -2,84 +2,73 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 1. CONFIGURAÇÃO CENTRALIZADA
-# Adicione ou ajuste as chaves conforme o nome exato das colunas nos seus CSVs
+# 1. CONFIGURAÇÃO CENTRALIZADA (Adicione ou ajuste conforme necessário)
+# O padrão interno do dashboard será: 'nome', 'cns', 'equipe', 'status'
 CONFIG = {
-    "Diabetes": {
-        "colunas_pendencia": ["Sem HbA1c", "Sem avaliação dos pés"],
-        "metricas": ["Consulta", "PA", "HbA1c", "Pés"]
-    },
-    "Gestação": {
-        "colunas_pendencia": ["Sem pré-natal", "Sem dTpa"],
-        "metricas": ["Consulta Pré-natal", "Testes Rápidos", "dTpa"]
-    },
-    "Infantil": {
-        "colunas_pendencia": ["Sem Pentavalente", "Sem Pólio"],
-        "metricas": ["Consulta 1º mês", "Pentavalente", "Pneumocócica"]
-    },
-    "Hipertensão": {
-        "colunas_pendencia": ["Sem PA"],
-        "metricas": ["Consulta", "PA", "Visitas"]
-    },
-    "Idoso": {
-        "colunas_pendencia": ["Sem Vacina Influenza"],
-        "metricas": ["Consulta Médica", "Visitas", "Vacina Influenza"]
-    },
-    "Câncer": {
-        "colunas_pendencia": ["Sem Rast. Colo", "Sem Rast. Mama"],
-        "metricas": ["Rast. Colo", "Rast. Mama", "Vacina HPV"]
-    }
+    "Diabetes": {"colunas": ["HbA1c", "Pés"]},
+    "Gestação": {"colunas": ["Pré-natal", "dTpa"]},
+    "Infantil": {"colunas": ["Consulta 1º mês", "Pentavalente"]},
+    "Hipertensão": {"colunas": ["PA"]},
+    "Idoso": {"colunas": ["Influenza"]},
+    "Câncer": {"colunas": ["Rast. Colo", "Rast. Mama"]}
 }
 
-# 2. FUNÇÃO DE NORMALIZAÇÃO
-def processar_dados(df, tipo):
-    """Padroniza colunas para um formato genérico para o Dashboard."""
-    df = df.copy()
-    # Mapeamento genérico para identificação
-    mapa_fixo = {
+# 2. FUNÇÃO DE LEITURA RESILIENTE (Resolve o erro de codificação)
+def carregar_dados(uploaded_file):
+    """Tenta ler o arquivo com diferentes codificações."""
+    for encoding in ['latin-1', 'utf-8', 'cp1252']:
+        try:
+            # Tenta CSV primeiro
+            return pd.read_csv(uploaded_file, encoding=encoding, sep=',')
+        except:
+            continue
+    
+    # Se falhar, tenta Excel (arquivos .xls renomeados como .csv)
+    try:
+        return pd.read_excel(uploaded_file)
+    except Exception as e:
+        st.error(f"Não foi possível ler o arquivo: {e}")
+        return None
+
+# 3. FUNÇÃO DE NORMALIZAÇÃO
+def normalizar_df(df):
+    """Padroniza nomes de colunas cruciais."""
+    mapeamento = {
         'Nome Completo': 'nome',
         'CNS': 'cns',
         'Equipe Área': 'equipe',
         'Acompanhado': 'status'
     }
-    df = df.rename(columns=mapa_fixo)
-    
-    # Garantir que colunas de status existam para filtros
-    if 'status' not in df.columns:
-        df['status'] = 'S' # Default se não encontrado
-    return df
+    return df.rename(columns=mapeamento)
 
-# 3. INTERFACE STREAMLIT
+# 4. INTERFACE PRINCIPAL
 st.set_page_config(layout="wide", page_title="Dashboard Saúde 360")
 st.title("Dashboard APS - Saúde 360")
 
-# Menu de seleção
 tipo_selecionado = st.sidebar.selectbox("Selecione o Indicador", list(CONFIG.keys()))
-uploaded_file = st.sidebar.file_uploader(f"Upload de Relatório - {tipo_selecionado}", type=["csv", "xls", "xlsx"])
+uploaded_file = st.sidebar.file_uploader(f"Upload - {tipo_selecionado}", type=["csv", "xls", "xlsx"])
 
 if uploaded_file:
-    # Leitura dinâmica
-    try:
-        df = pd.read_csv(uploaded_file)
-        df_processado = processar_dados(df, tipo_selecionado)
+    df = carregar_dados(uploaded_file)
+    if df is not None:
+        df_processado = normalizar_df(df)
         
-        st.subheader(f"Análise de {tipo_selecionado}")
+        st.success(f"Dados de {tipo_selecionado} carregados com sucesso!")
         
-        # Métricas Globais
-        c1, c2, c3 = st.columns(3)
+        # Exemplo de visualização modular
+        c1, c2 = st.columns(2)
         c1.metric("Total de Pacientes", len(df_processado))
-        c2.metric("Acompanhados", df_processado['status'].value_counts().get('S', 0))
         
-        # Filtros e Visualização
-        st.write("### Visão Geral por Equipe")
+        # Filtro de status se existir
+        if 'status' in df_processado.columns:
+            acompanhados = df_processado['status'].value_counts().get('S', 0)
+            c2.metric("Acompanhados", acompanhados)
+        
+        st.dataframe(df_processado.head())
+        
+        # Gráfico dinâmico por equipe
         if 'equipe' in df_processado.columns:
-            fig = px.bar(df_processado['equipe'].value_counts(), title="Pacientes por Equipe")
+            fig = px.bar(df_processado['equipe'].value_counts(), title="Atendimento por Equipe")
             st.plotly_chart(fig, use_container_width=True)
-            
-        st.write("### Lista Nominal")
-        st.dataframe(df_processado)
-        
-    except Exception as e:
-        st.error(f"Erro ao processar arquivo: {e}")
-else:
-    st.info("Por favor, faça o upload do arquivo CSV correspondente ao indicador selecionado.")
+
+[Image of a data ingestion pipeline handling different file encoding formats]
