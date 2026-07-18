@@ -9,12 +9,12 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-st.set_page_config(page_title="Saúde 360 APS teste 3", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Saúde 360 APS", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
 
 def strip_accents(text: str) -> str:
     text = str(text)
-    return ''.join(c for c in unicodedata.normalize('NFKD', text) if not unicodedata.combining(c))
+    return ''.join(ch for ch in unicodedata.normalize('NFKD', text) if not unicodedata.combining(ch))
 
 
 def normalize_col(name: str) -> str:
@@ -31,12 +31,11 @@ def to_bool(series: pd.Series) -> pd.Series:
     return vals.isin(["1", "true", "sim", "s", "x", "ok", "yes"])
 
 
-def count_to_bool(series: pd.Series) -> pd.Series:
+def parse_count(series: pd.Series) -> pd.Series:
     vals = series.astype(str).str.strip().str.lower()
-    vals = vals.replace({"nan": "", "none": "", "": "0", "n": "0", "nao": "0", "não": "0"})
+    vals = vals.replace({"": np.nan, "nan": np.nan, "none": np.nan, "n/a": np.nan})
     vals = vals.str.replace("+", "", regex=False)
-    nums = pd.to_numeric(vals, errors="coerce").fillna(0)
-    return nums > 0
+    return pd.to_numeric(vals, errors="coerce")
 
 
 def ensure_columns(df: pd.DataFrame, columns: List[str], default=False) -> pd.DataFrame:
@@ -110,11 +109,9 @@ def calculate_score_indicator(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataF
     for c in list(weights.keys()) + list(applicability.values()):
         if c not in df.columns:
             df[c] = False
-
     total_score = np.zeros(len(df), dtype=float)
     total_pendencias = np.zeros(len(df), dtype=int)
     total_aplicaveis = np.zeros(len(df), dtype=int)
-
     for col, weight in weights.items():
         pratica_ok = to_bool(df[col])
         aplicavel = pd.Series(True, index=df.index)
@@ -122,11 +119,9 @@ def calculate_score_indicator(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataF
             aplicavel &= to_bool(df[applicability[col]])
         if col in non_conditionals:
             aplicavel &= ~non_conditionals[col](df).fillna(False).astype(bool)
-
         total_score += np.where(aplicavel & pratica_ok, weight, 0)
         total_pendencias += np.where(aplicavel & ~pratica_ok, 1, 0)
         total_aplicaveis += np.where(aplicavel, 1, 0)
-
     df["score"] = total_score
     df["pendencias"] = total_pendencias
     df["praticas_aplicaveis"] = total_aplicaveis
@@ -148,26 +143,29 @@ def read_uploaded_file(uploaded_file) -> pd.DataFrame:
         for enc in ["utf-8", "latin1", "cp1252"]:
             uploaded_file.seek(0)
             try:
-                return pd.read_csv(uploaded_file, encoding=enc)
+                return pd.read_csv(uploaded_file, encoding=enc, dtype=str)
             except Exception:
                 pass
         uploaded_file.seek(0)
-        return pd.read_csv(uploaded_file)
+        return pd.read_csv(uploaded_file, dtype=str)
     if suffix.endswith(".xlsx") or suffix.endswith(".xls"):
         uploaded_file.seek(0)
-        return pd.read_excel(uploaded_file)
+        return pd.read_excel(uploaded_file, dtype=str)
     raise ValueError("Formato não suportado. Envie CSV, XLSX ou XLS.")
 
 
 def preprocess_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
+    original_cols = list(df.columns)
     df.columns = [normalize_col(c) for c in df.columns]
+
     alias_map = {
+        "nome_completo": "nome",
         "usuario": "nome",
         "paciente": "nome",
-        "nome_completo": "nome",
         "microarea": "micro_area",
         "equipe_area": "equipe",
+        "equipe_vinculo": "equipe_vinculo",
         "ine": "equipe_ine",
         "equipe_saude": "equipe",
         "nome_equipe": "equipe",
@@ -177,180 +175,96 @@ def preprocess_df(df: pd.DataFrame) -> pd.DataFrame:
         "data_de_nascimento": "data_nascimento",
         "dt_nascimento": "data_nascimento",
         "nascimento": "data_nascimento",
-        "logradouro": "endereco",
         "endereco_paciente": "endereco",
-        "localizacao": "endereco",
-        # Relatórios de hipertensão/idosa/gestante usam o nome por extenso da
-        # aferição de PA, enquanto o de diabetes usa a sigla — unificamos aqui
-        # para que todo o resto do código só precise checar "afericao_de_pa".
-        "afericao_de_pressao_arterial": "afericao_de_pa",
+        "logradouro": "endereco",
+        "cadastro_atualizado": "cadastro_atualizado",
+        "data_atualizacao_cadastro": "data_atualizacao_cadastro",
     }
     for old, new in alias_map.items():
         if old in df.columns and new not in df.columns:
             df[new] = df[old]
 
-    for c in ["cpf", "cns", "micro_area", "equipe_ine", "equipe_vinculo"]:
-        if c in df.columns:
-            df[c] = df[c].astype("string")
+    for txt in ["cpf", "cns", "micro_area", "equipe_ine", "tipo_equipe", "equipe_vinculo"]:
+        if txt in df.columns:
+            df[txt] = df[txt].astype("string")
 
     if "idade" in df.columns:
         df["idade"] = pd.to_numeric(df["idade"], errors="coerce")
     else:
         df["idade"] = np.nan
 
-    for c in ["nome", "equipe", "unidade", "tipo_equipe", "sexo", "cns", "cpf", "micro_area", "equipe_ine", "data_nascimento", "endereco"]:
+    for c in ["nome", "equipe", "unidade", "tipo_equipe", "sexo", "cns", "cpf", "micro_area", "equipe_ine", "data_nascimento", "endereco", "equipe_vinculo"]:
         if c not in df.columns:
             df[c] = ""
 
-    if "data_nascimento" in df.columns:
-        dt = pd.to_datetime(df["data_nascimento"], errors="coerce", dayfirst=True)
-        formatted = dt.dt.strftime("%d/%m/%Y")
-        original = df["data_nascimento"].astype(str)
-        df["data_nascimento"] = np.where(dt.notna(), formatted, original)
+    date_cols = [c for c in ["data_nascimento", "data_atualizacao_cadastro"] if c in df.columns]
+    for c in date_cols:
+        dt = pd.to_datetime(df[c], errors="coerce", dayfirst=True)
+        original = df[c].astype(str)
+        df[c] = np.where(dt.notna(), dt.dt.strftime("%d/%m/%Y"), original)
+
+    if "tipo_equipe" not in df.columns and "equipe_vinculo" in df.columns:
+        df["tipo_equipe"] = ""
+
+    if "consulta_medica_enfermagem" in df.columns:
+        df["consulta_ok"] = to_bool(df["consulta_medica_enfermagem"])
+    if "hemoglobina_glicada" in df.columns:
+        df["hba1c_ok"] = to_bool(df["hemoglobina_glicada"])
+        df["solicitacao_ok"] = to_bool(df["hemoglobina_glicada"])
+    if "avaliacao_dos_pes" in df.columns:
+        df["pes_ok"] = to_bool(df["avaliacao_dos_pes"])
+    if "afericao_de_pa" in df.columns:
+        df["pa_ok"] = to_bool(df["afericao_de_pa"])
+    if "qtd_registros_de_peso_altura" in df.columns:
+        qtd_pa = parse_count(df["qtd_registros_de_peso_altura"])
+        df["peso_altura_ok"] = qtd_pa.fillna(0).ge(1)
+        df["antropometria_ok"] = qtd_pa.fillna(0).ge(1)
+    if "qtd_visitas_domiciliares" in df.columns:
+        qtd_vis = parse_count(df["qtd_visitas_domiciliares"])
+        df["visita_ok"] = qtd_vis.fillna(0).ge(1)
+        df["visitas_ok"] = qtd_vis.fillna(0).ge(1)
+    if "acompanhado" in df.columns:
+        df["acompanhado_ok"] = to_bool(df["acompanhado"])
+
+    if "vacina_influenza" in df.columns:
+        df["influenza_ok"] = to_bool(df["vacina_influenza"])
+    if "citopatologico" in df.columns:
+        df["colo_utero_ok"] = to_bool(df["citopatologico"])
+    if "hpv" in df.columns:
+        df["hpv_ok"] = to_bool(df["hpv"])
+    if "saude_sexual_reprodutiva" in df.columns:
+        df["saude_reprodutiva_ok"] = to_bool(df["saude_sexual_reprodutiva"])
+    if "mamografia" in df.columns:
+        df["mama_ok"] = to_bool(df["mamografia"])
+
+    if "idade" in df.columns:
+        idade = pd.to_numeric(df["idade"], errors="coerce")
+        df["colo_utero_aplicavel"] = idade.between(25, 64, inclusive="both")
+        df["hpv_aplicavel"] = idade.between(9, 14, inclusive="both")
+        df["saude_reprodutiva_aplicavel"] = idade.between(25, 64, inclusive="both")
+        df["mama_aplicavel"] = idade.between(50, 69, inclusive="both")
 
     df["faixa_etaria"] = df["idade"].apply(faixa_etaria)
+    df.attrs["original_columns"] = original_cols
     return df
 
 
-def apply_report_mapping(df: pd.DataFrame, indicator_code: str) -> pd.DataFrame:
-    df = df.copy()
-
-    if indicator_code == "C4":
-        if "consulta_medica_enfermagem" in df.columns:
-            df["consulta_ok"] = to_bool(df["consulta_medica_enfermagem"])
-        if "hemoglobina_glicada" in df.columns:
-            df["hba1c_ok"] = to_bool(df["hemoglobina_glicada"])
-        if "avaliacao_dos_pes" in df.columns:
-            df["pes_ok"] = to_bool(df["avaliacao_dos_pes"])
-        if "qtd_visitas_domiciliares" in df.columns:
-            df["visita_ok"] = count_to_bool(df["qtd_visitas_domiciliares"])
-        if "afericao_de_pa" in df.columns and "pa_ok" not in df.columns:
-            df["pa_ok"] = to_bool(df["afericao_de_pa"])
-        if "qtd_registros_de_peso_altura" in df.columns and "antropometria_ok" not in df.columns:
-            df["antropometria_ok"] = count_to_bool(df["qtd_registros_de_peso_altura"])
-        if "solicitacao_ok" not in df.columns:
-            df["solicitacao_ok"] = False
-        if "retina_ok" not in df.columns:
-            df["retina_ok"] = False
-
-    if indicator_code == "C5":
-        # Nota: o relatório real de hipertensão usa "Aferição de pressão arterial"
-        # (não "Aferição de PA" como no de diabetes) — já normalizado para
-        # "afericao_de_pa" pelo alias_map em preprocess_df.
-        if "consulta_medica_enfermagem" in df.columns:
-            df["consulta_ok"] = to_bool(df["consulta_medica_enfermagem"])
-        if "afericao_de_pa" in df.columns:
-            df["pa_ok"] = to_bool(df["afericao_de_pa"])
-        if "qtd_registros_de_peso_altura" in df.columns:
-            df["antropometria_ok"] = count_to_bool(df["qtd_registros_de_peso_altura"])
-        if "qtd_visitas_domiciliares" in df.columns:
-            df["visita_ok"] = count_to_bool(df["qtd_visitas_domiciliares"])
-
-    if indicator_code == "C6":
-        if "consulta_medica_enfermagem" in df.columns:
-            df["consulta_ok"] = to_bool(df["consulta_medica_enfermagem"])
-        if "qtd_registros_de_peso_altura" in df.columns:
-            df["antropometria_ok"] = count_to_bool(df["qtd_registros_de_peso_altura"])
-        if "qtd_visitas_domiciliares" in df.columns:
-            df["visitas_ok"] = count_to_bool(df["qtd_visitas_domiciliares"])
-        # Coluna real do relatório é "Vacina influenza" -> "vacina_influenza"
-        # (o nome antigo "vacinacao_influenza" nunca existiu nos dados reais).
-        if "vacina_influenza" in df.columns:
-            df["influenza_ok"] = to_bool(df["vacina_influenza"])
-        elif "vacinacao_influenza" in df.columns:
-            df["influenza_ok"] = to_bool(df["vacinacao_influenza"])
-
-    if indicator_code == "C2":
-        if "nr_consultas" in df.columns:
-            df["consulta_ok"] = count_to_bool(df["nr_consultas"])
-        elif "consulta_medica_enfermagem_1o_mes" in df.columns:
-            df["consulta_ok"] = to_bool(df["consulta_medica_enfermagem_1o_mes"])
-        if "esquema_vacinal_completo" in df.columns:
-            df["vacina_ok"] = to_bool(df["esquema_vacinal_completo"])
-        if "qtd_registros_de_peso_altura" in df.columns:
-            df["peso_altura_ok"] = count_to_bool(df["qtd_registros_de_peso_altura"])
-        if "visita_domiciliar_1o_mes" in df.columns and "visita_domiciliar_6o_mes" in df.columns:
-            # Exige as duas visitas (1º e 6º mês) para considerar a prática cumprida.
-            df["visita_ok"] = to_bool(df["visita_domiciliar_1o_mes"]) & to_bool(df["visita_domiciliar_6o_mes"])
-        # "desenvolvimento_ok" (avaliação do desenvolvimento neuropsicomotor) não
-        # existe como coluna própria no relatório padrão de Desenvolvimento Infantil.
-        # Fica como pendência por padrão até que o sistema exporte essa informação
-        # separadamente (ou até você indicar outra coluna equivalente).
-        if "desenvolvimento_ok" not in df.columns:
-            df["desenvolvimento_ok"] = False
-
-    if indicator_code == "C3":
-        if "consulta_de_pre_natal_ate_12_semanas" in df.columns:
-            df["pre_natal_12s_ok"] = to_bool(df["consulta_de_pre_natal_ate_12_semanas"])
-        if "consulta_medica_enfermagem_gestacao" in df.columns:
-            df["consultas_gest_ok"] = to_bool(df["consulta_medica_enfermagem_gestacao"])
-        if "afericao_de_pa" in df.columns:
-            df["pa_ok"] = to_bool(df["afericao_de_pa"])
-        if "registro_de_peso_altura" in df.columns:
-            df["antropometria_ok"] = to_bool(df["registro_de_peso_altura"])
-        if "visitas_domiciliares_acs_tacs_gestacao" in df.columns:
-            df["visitas_gest_ok"] = count_to_bool(df["visitas_domiciliares_acs_tacs_gestacao"])
-        if "vacina_dtpa" in df.columns:
-            df["dtpa_ok"] = to_bool(df["vacina_dtpa"])
-
-        tri1_cols = [c for c in [
-            "teste_rapido_sifilis_primeiro_trimestre",
-            "teste_rapido_hiv_primeiro_trimestre",
-            "teste_rapido_hepatite_b_primeiro_trimestre",
-            "teste_rapido_hepatite_c_primeiro_trimestre",
-        ] if c in df.columns]
-        if tri1_cols:
-            df["tri1_ok"] = np.all([to_bool(df[c]) for c in tri1_cols], axis=0)
-
-        tri3_cols = [c for c in [
-            "teste_rapido_sifilis_terceiro_trimestre",
-            "teste_rapido_hiv_terceiro_trimestre",
-        ] if c in df.columns]
-        if tri3_cols:
-            df["tri3_ok"] = np.all([to_bool(df[c]) for c in tri3_cols], axis=0)
-
-        if "consulta_medica_enfermagem_puerperio" in df.columns:
-            df["puerperio_consulta_ok"] = to_bool(df["consulta_medica_enfermagem_puerperio"])
-        if "visitas_domiciliares_acs_tacs_puerperio" in df.columns:
-            df["puerperio_visita_ok"] = to_bool(df["visitas_domiciliares_acs_tacs_puerperio"])
-        if "avaliacao_odontologica_gestacao" in df.columns:
-            df["odonto_ok"] = to_bool(df["avaliacao_odontologica_gestacao"])
-
-    if indicator_code == "C7":
-        if "rast_cancer_do_colo_do_utero" in df.columns:
-            df["colo_utero_ok"] = to_bool(df["rast_cancer_do_colo_do_utero"])
-        if "vacina_hpv_entre_9_e_14_anos" in df.columns:
-            df["hpv_ok"] = to_bool(df["vacina_hpv_entre_9_e_14_anos"])
-        if "atend_saude_reprodutiva" in df.columns:
-            df["saude_reprodutiva_ok"] = to_bool(df["atend_saude_reprodutiva"])
-        if "rast_cancer_de_mama" in df.columns:
-            df["mama_ok"] = to_bool(df["rast_cancer_de_mama"])
-        # O relatório não traz colunas de elegibilidade explícitas; aplicamos as
-        # mesmas faixas etárias usadas no gerador de demonstração (regras do Saúde 360).
-        if "idade" in df.columns:
-            idade = pd.to_numeric(df["idade"], errors="coerce")
-            df["colo_utero_aplicavel"] = idade.between(25, 64)
-            df["hpv_aplicavel"] = idade.between(9, 14)
-            df["saude_reprodutiva_aplicavel"] = idade.between(25, 64)
-            df["mama_aplicavel"] = idade.between(50, 69)
-
-    return df
-
-
-def detect_indicator_by_columns(df: pd.DataFrame) -> Optional[str]:
-    cols = set(df.columns)
-    if {"hemoglobina_glicada", "avaliacao_dos_pes"}.issubset(cols):
+def detect_indicator_from_name(filename: str) -> Optional[str]:
+    n = normalize_col(filename)
+    if "diabetes" in n:
         return "C4"
-    if {"vacina_influenza"}.issubset(cols):
-        return "C6"
-    if {"afericao_de_pa", "qtd_registros_de_peso_altura"}.issubset(cols):
+    if "hipertensao" in n:
         return "C5"
-    if {"visita_domiciliar_1o_mes", "vacina_pentavalente"}.issubset(cols):
-        return "C2"
-    if {"consulta_de_pre_natal_ate_12_semanas", "vacina_dtpa"}.issubset(cols):
-        return "C3"
-    if {"rast_cancer_do_colo_do_utero", "rast_cancer_de_mama"}.issubset(cols):
+    if "idosa" in n or "idoso" in n:
+        return "C6"
+    if "cancer" in n or "mulher" in n:
         return "C7"
+    if "gestante" in n or "puerpera" in n or "gestacao" in n:
+        return "C3"
+    if "desenvolvimento_infantil" in n or "infantil" in n:
+        return "C2"
+    if "acesso" in n:
+        return "C1"
     return None
 
 
@@ -409,12 +323,7 @@ def indicator_summary(df: pd.DataFrame, spec: IndicatorSpec) -> Dict[str, float]
         numer = int((to_bool(df[spec.denominator_col]) & to_bool(df[spec.numerator_col])).sum()) if len(df) else 0
         resultado = round((numer / denom) * 100, 1) if denom else 0.0
         return {"entidades": len(df), "denominador": denom, "numerador": numer, "resultado": resultado}
-    return {
-        "entidades": len(df),
-        "score_medio": round(df["score"].mean(), 1) if len(df) else 0.0,
-        "score_max": round(df["score"].max(), 1) if len(df) else 0.0,
-        "com_pendencias": int((df["pendencias"] > 0).sum()) if len(df) else 0,
-    }
+    return {"entidades": len(df), "score_medio": round(df["score"].mean(), 1) if len(df) else 0.0, "score_max": round(df["score"].max(), 1) if len(df) else 0.0, "com_pendencias": int((df["pendencias"] > 0).sum()) if len(df) else 0}
 
 
 def microarea_summary(df: pd.DataFrame, spec: IndicatorSpec) -> str:
@@ -441,8 +350,8 @@ def render_summary(df: pd.DataFrame, spec: IndicatorSpec):
     if spec.type == "percentual":
         c1.metric("Total", summary["entidades"])
         c2.metric("Resultado", f"{summary['resultado']}%")
-        c3.metric("Numerador", summary["numerador"])
-        c4.metric("Denominador", summary["denominador"])
+        c3.metric("Melhor microárea", microarea_summary(df, spec))
+        c4.metric("Pendências", max(summary["denominador"] - summary["numerador"], 0))
     else:
         c1.metric("Total", summary["entidades"])
         c2.metric("Score médio", summary["score_medio"])
@@ -450,78 +359,98 @@ def render_summary(df: pd.DataFrame, spec: IndicatorSpec):
         c4.metric("Com pendências", summary["com_pendencias"])
 
 
+def render_charts(df: pd.DataFrame, spec: IndicatorSpec):
+    if spec.type == "percentual":
+        if "equipe" in df.columns:
+            g = df.assign(_num=to_bool(df[spec.numerator_col]), _den=to_bool(df[spec.denominator_col])).groupby("equipe", dropna=False).agg(numerador=("_num", "sum"), denominador=("_den", "sum")).reset_index()
+            g["resultado"] = np.where(g["denominador"] > 0, (g["numerador"] / g["denominador"]) * 100, 0)
+            fig = px.bar(g.sort_values("resultado", ascending=False), x="equipe", y="resultado", title="Resultado por equipe")
+            st.plotly_chart(fig, use_container_width=True)
+        return
+    col1, col2 = st.columns(2)
+    if "equipe" in df.columns:
+        g1 = df.groupby("equipe", dropna=False).agg(score_medio=("score", "mean")).reset_index().sort_values("score_medio", ascending=False)
+        col1.plotly_chart(px.bar(g1, x="equipe", y="score_medio", title="Score médio por equipe"), use_container_width=True)
+    if "classificacao" in df.columns:
+        g2 = df.groupby("classificacao", dropna=False).size().reset_index(name="qtd")
+        col2.plotly_chart(px.pie(g2, names="classificacao", values="qtd", title="Classificação"), use_container_width=True)
+
+
+def render_table(df: pd.DataFrame, spec: IndicatorSpec):
+    base_cols = [c for c in ["nome", "idade", "faixa_etaria", "equipe", "micro_area", "unidade", "cpf", "cns"] if c in df.columns]
+    metric_cols = [spec.numerator_col, spec.denominator_col] if spec.type == "percentual" else list((spec.weights or {}).keys()) + ["score", "pendencias", "classificacao"]
+    cols = [c for c in base_cols + metric_cols if c in df.columns]
+    st.dataframe(df[cols], use_container_width=True, hide_index=True)
+
+
+def quality_report(df: pd.DataFrame):
+    q = pd.DataFrame({
+        "coluna": df.columns,
+        "nulos": [int(df[c].isna().sum()) for c in df.columns],
+        "vazios": [int(df[c].astype(str).str.strip().eq("").sum()) for c in df.columns],
+        "unicos": [int(df[c].nunique(dropna=True)) for c in df.columns],
+    }).sort_values(["nulos", "vazios"], ascending=False)
+    st.dataframe(q, use_container_width=True, hide_index=True)
+
+
+def process_indicator(df: pd.DataFrame, indicator_code: str) -> pd.DataFrame:
+    spec = INDICATORS[indicator_code]
+    df = preprocess_df(df)
+    if spec.type == "percentual":
+        return calculate_percent_indicator(df, spec)
+    return calculate_score_indicator(df, spec)
+
+
 def main():
     st.title("Saúde 360 APS")
-    st.caption(
-        "Painel com parser ajustado para os relatórios reais de: Mais Acesso (C1)*, "
-        "Desenvolvimento Infantil (C2), Gestante/Puerpério (C3), Diabetes (C4), "
-        "Hipertensão (C5), Pessoa Idosa (C6) e Prevenção do Câncer da Mulher (C7). "
-        "*C1 ainda sem relatório de exemplo — ver aviso ao selecioná-lo."
-    )
+    st.caption("Dashboard multiperfil para os 7 indicadores com leitura de arquivos reais.")
 
     with st.sidebar:
-        indicador = st.selectbox("Indicador", list(INDICATORS.keys()), format_func=lambda x: f"{x} — {INDICATORS[x].name}")
-        uploaded = st.file_uploader("Envie CSV/XLS/XLSX", type=["csv", "xls", "xlsx"])
-        usar_demo = st.checkbox("Usar dados de demonstração", value=uploaded is None)
+        indicator_code = st.selectbox("Indicador", list(INDICATORS.keys()), format_func=lambda x: f"{x} — {INDICATORS[x].name}")
+        uploaded = st.file_uploader("Envie CSV, XLS ou XLSX", type=["csv", "xls", "xlsx"])
+        st.markdown("---")
+        tpl = pd.DataFrame(columns=template_columns(indicator_code))
+        st.download_button("Baixar template Excel", data=to_excel_bytes(tpl), file_name=f"template_{indicator_code}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    if indicador == "C1":
-        st.warning(
-            "O indicador C1 (Mais acesso na APS) ainda não tem um relatório de exemplo real "
-            "mapeado. Envie um relatório desse indicador para que eu possa ajustar o parser "
-            "com os nomes de coluna corretos."
-        )
-    if indicador == "C2":
-        st.info(
-            "No relatório de Desenvolvimento Infantil não há uma coluna específica de "
-            "'avaliação do desenvolvimento' — essa prática fica como pendência até você "
-            "confirmar se existe outra coluna equivalente no seu sistema."
-        )
+    if not uploaded:
+        st.warning("Envie um arquivo para continuar.")
+        return
+    raw = read_uploaded_file(uploaded)
+    guessed = detect_indicator_from_name(uploaded.name)
+    processed = process_indicator(raw, indicator_code)
 
-    spec = INDICATORS[indicador]
+    spec = INDICATORS[indicator_code]
 
-    if usar_demo and uploaded is None:
-        df = create_demo_dataframe(indicador)
-        st.info("Exibindo dados de demonstração.")
-    elif uploaded is not None:
-        raw = read_uploaded_file(uploaded)
-        df = preprocess_df(raw)
-        detectado = detect_indicator_by_columns(df)
-        if detectado and detectado != indicador:
-            st.warning(f"O arquivo parece ser do indicador {detectado}, mas o seletor está em {indicador}.")
-        df = apply_report_mapping(df, indicador)
-        st.write("Colunas identificadas:", list(df.columns))
-    else:
-        st.stop()
+    # filtros laterais adicionais
+    with st.sidebar:
+        st.markdown("### Filtros")
+        if "equipe" in processed.columns:
+            equipes = sorted([e for e in processed["equipe"].astype(str).dropna().unique() if e.strip()])
+            equipe_sel = st.multiselect("Equipes", equipes)
+            if equipe_sel:
+                processed = processed[processed["equipe"].isin(equipe_sel)]
+        if "micro_area" in processed.columns:
+            micros = sorted([e for e in processed["micro_area"].astype(str).dropna().unique() if e.strip()])
+            micro_sel = st.selectbox("Microárea", ["Todas"] + micros)
+            if micro_sel != "Todas":
+                processed = processed[processed["micro_area"].astype(str) == micro_sel]
+        if "faixa_etaria" in processed.columns:
+            faixas = sorted([e for e in processed["faixa_etaria"].astype(str).dropna().unique() if e.strip()])
+            faixa_sel = st.selectbox("Faixa etária", ["Todas"] + faixas)
+            if faixa_sel != "Todas":
+                processed = processed[processed["faixa_etaria"].astype(str) == faixa_sel]
+        if spec.type == "score" and "pendencias" in processed.columns:
+            pendencia_sel = st.checkbox("Por pendências (somente quem tem pendência)")
+            if pendencia_sel:
+                processed = processed[processed["pendencias"] > 0]
 
-    if spec.type == "percentual":
-        result = calculate_percent_indicator(df, spec)
-    else:
-        result = calculate_score_indicator(df, spec)
-
-    render_summary(result, spec)
-
-    if spec.type == "score" and "score" in result.columns:
-        tab1, tab2, tab3 = st.tabs(["Painel", "Dados", "Qualidade"])
-        with tab1:
-            if "equipe" in result.columns:
-                equipe = result.groupby("equipe", dropna=False).agg(score_medio=("score", "mean"), pessoas=("nome", "count")).reset_index().sort_values("score_medio", ascending=False)
-                fig = px.bar(equipe, x="equipe", y="score_medio", text="pessoas", title="Score médio por equipe")
-                st.plotly_chart(fig, use_container_width=True)
-            if "classificacao" in result.columns:
-                fig2 = px.histogram(result, x="classificacao", color="classificacao", title="Distribuição por classificação")
-                st.plotly_chart(fig2, use_container_width=True)
-        with tab2:
-            st.dataframe(result, use_container_width=True)
-            st.download_button("Baixar CSV tratado", data=result.to_csv(index=False).encode("utf-8-sig"), file_name=f"{indicador.lower()}_tratado.csv", mime="text/csv")
-        with tab3:
-            qual = pd.DataFrame({
-                "coluna": result.columns,
-                "nulos": [int(result[c].isna().sum()) for c in result.columns],
-                "preenchidos": [int(result[c].notna().sum()) for c in result.columns],
-            })
-            st.dataframe(qual, use_container_width=True)
-    else:
-        st.dataframe(result, use_container_width=True)
+    render_summary(processed, spec)
+    render_charts(processed, spec)
+    st.markdown("---")
+    render_table(processed, spec)
+    csv_bytes = processed.to_csv(index=False).encode("utf-8-sig")
+    st.download_button("Baixar CSV tratado", data=csv_bytes, file_name=f"{indicator_code.lower()}_tratado.csv", mime="text/csv")
+    st.download_button("Baixar Excel tratado", data=to_excel_bytes(processed), file_name=f"{indicator_code.lower()}_tratado.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 if __name__ == "__main__":
