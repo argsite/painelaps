@@ -3,9 +3,11 @@ import pandas as pd
 import plotly.express as px
 import os
 
-# 1. CONFIGURAÇÃO (Certifique-se que estes nomes batem com as colunas do seu relatório)
+# 1. CONFIGURAÇÃO (Adicione todas as colunas que deseja monitorar)
 CONFIG = {
-    "Diabetes": {"pendencias": ["Sem HbA1c", "Sem avaliação dos pés"]},
+    "Diabetes": {
+        "pendencias": ["Sem HbA1c", "Sem avaliação dos pés", "Sem Consulta", "Sem Visitas"]
+    },
     "Gestação": {"pendencias": ["Sem pré-natal", "Sem dTpa"]},
     "Infantil": {"pendencias": ["Sem consulta", "Sem Pentavalente"]},
     "Hipertensão": {"pendencias": ["Sem PA"]},
@@ -26,17 +28,31 @@ def carregar_dados(uploaded_file):
     except: return None
 
 def processar_df(df, tipo):
+    # Mapeamento padrão
     mapeamento = {'Nome Completo': 'nome', 'CNS': 'cns', 'Equipe Área': 'equipe', 
                   'Microárea': 'micro', 'Idade': 'idade', 'Acompanhado': 'status'}
     df = df.rename(columns=mapeamento)
+    
+    # Lógica para colunas de Consulta/Visitas (Numéricas)
+    # Se o nome da coluna no seu Excel contiver "Consulta" ou "Visitas", tratamos como número
+    for col in df.columns:
+        if any(x in col for x in ["Consulta", "Visitas"]):
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace('+', ''), errors='coerce').fillna(0)
+            # Cria a coluna "Sem..." se ela não existir
+            col_pend = f"Sem {col.replace('Sem ', '')}"
+            df[col_pend] = df[col].apply(lambda x: 'N' if x == 0 else 'S')
+            
+    # Garantir colunas padrão
     for col in ['micro', 'idade', 'status', 'equipe']:
         if col not in df.columns: df[col] = 'N/A'
     
+    # Calcular total de pendências
     cols_pend = CONFIG[tipo]["pendencias"]
     cols_existentes = [c for c in cols_pend if c in df.columns]
     df['Total Pendências'] = df[cols_existentes].eq('N').sum(axis=1) if cols_existentes else 0
     return df
 
+# 4. INTERFACE
 st.set_page_config(layout="wide", page_title="Dashboard Saúde 360")
 st.title("Dashboard APS - Saúde 360")
 
@@ -44,49 +60,34 @@ tipo_sel = st.sidebar.selectbox("Indicador", list(CONFIG.keys()))
 uploaded_file = st.sidebar.file_uploader("Upload", type=["csv", "xls", "xlsx"])
 
 if uploaded_file:
-    df_raw = carregar_dados(uploaded_file)
-    if df_raw is not None:
-        df_base = processar_df(df_raw, tipo_sel)
-        
-        # DEBUG: Se o filtro der erro, descomente a linha abaixo para ver os nomes reais das colunas
-        # st.write("Colunas detectadas:", df_base.columns.tolist())
-        
-        # --- FILTROS ---
-        st.sidebar.markdown("### 🔍 Filtros de Busca Ativa")
-        df_filtrado = df_base.copy()
-        
-        if 'equipe' in df_base.columns:
-            sel_eq = st.sidebar.multiselect("Equipe", sorted(df_base['equipe'].astype(str).unique()))
-            if sel_eq: df_filtrado = df_filtrado[df_filtrado['equipe'].isin(sel_eq)]
-        
-        if 'micro' in df_base.columns:
-            sel_micro = st.sidebar.multiselect("Microárea", sorted(df_base['micro'].astype(str).unique()))
-            if sel_micro: df_filtrado = df_filtrado[df_filtrado['micro'].isin(sel_micro)]
+    df_base = processar_df(carregar_dados(uploaded_file), tipo_sel)
+    
+    # --- FILTROS ---
+    st.sidebar.markdown("### 🔍 Filtros de Busca Ativa")
+    df_filtrado = df_base.copy()
+    
+    # Filtros de Categorias
+    for col in ['equipe', 'micro', 'idade']:
+        if col in df_filtrado.columns:
+            sel = st.sidebar.multiselect(col.capitalize(), sorted(df_base[col].astype(str).unique()))
+            if sel: df_filtrado = df_filtrado[df_filtrado[col].isin(sel)]
             
-        if 'idade' in df_base.columns:
-            sel_idade = st.sidebar.multiselect("Faixa Etária", sorted(df_base['idade'].astype(str).unique()))
-            if sel_idade: df_filtrado = df_filtrado[df_filtrado['idade'].isin(sel_idade)]
-
-        pend_existentes = [p for p in CONFIG[tipo_sel]["pendencias"] if p in df_base.columns]
-        sel_pend = st.sidebar.multiselect("Pendências", pend_existentes)
+    # Filtro de Pendências (Dinâmico)
+    pend_existentes = [p for p in CONFIG[tipo_sel]["pendencias"] if p in df_base.columns]
+    sel_pend = st.sidebar.multiselect("Pendências", pend_existentes)
+    if sel_pend:
+        df_filtrado = df_filtrado[df_filtrado[sel_pend].eq('N').any(axis=1)]
         
-        if sel_pend:
-            # Filtra apenas se as colunas selecionadas existirem no df_filtrado
-            df_filtrado = df_filtrado[df_filtrado[sel_pend].eq('N').any(axis=1)]
-        
-        # --- PAINEL ---
-        st.subheader("📊 Visão Geral (Base Completa)")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total de Pacientes", len(df_base))
-        c2.metric("Acompanhados", df_base[df_base['status'] == 'S'].shape[0])
-        c3.metric("Média de Pendências", f"{df_base['Total Pendências'].mean():.1f}")
-        
-        st.divider()
-        
-        st.subheader(f"📋 Busca Ativa ({len(df_filtrado)} pacientes)")
-        st.dataframe(df_filtrado.sort_values(by='Total Pendências', ascending=False), use_container_width=True)
-        
-        csv = df_filtrado.to_csv(index=False).encode('utf-8')
-        st.download_button("Baixar Lista Filtrada", csv, "busca_ativa.csv", "text/csv")
-else:
-    st.info("Aguardando o upload do arquivo.")
+    # --- PAINEL ---
+    st.subheader("📊 Visão Geral (Base Completa)")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total de Pacientes", len(df_base))
+    c2.metric("Acompanhados", df_base[df_base['status'] == 'S'].shape[0])
+    c3.metric("Média de Pendências", f"{df_base['Total Pendências'].mean():.1f}")
+    
+    st.divider()
+    st.subheader(f"📋 Busca Ativa ({len(df_filtrado)} pacientes)")
+    st.dataframe(df_filtrado.sort_values(by='Total Pendências', ascending=False), use_container_width=True)
+    
+    csv = df_filtrado.to_csv(index=False).encode('utf-8')
+    st.download_button("Baixar Lista Filtrada", csv, "busca_ativa.csv", "text/csv")
