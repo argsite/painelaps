@@ -1,508 +1,691 @@
 import io
 import re
-from datetime import datetime
-from typing import Dict, List, Tuple
+import unicodedata
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
-st.set_page_config(page_title="Saúde 360 - Painel de Indicadores", layout="wide")
+st.set_page_config(page_title="Saúde 360 APS", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
-# =========================
-# Configuração dos indicadores
-# =========================
-INDICATORS = {
-    "C1": {
-        "nome": "Mais acesso",
-        "tipo": "percentual",
-        "descricao": "Indicador de acesso com foco em cadastro e vínculo.",
-        "boas_praticas": [
-            {"key": "cadastro_atualizado", "label": "Cadastro atualizado", "peso": 1.0},
-            {"key": "vinculo", "label": "Equipe de vínculo informada", "peso": 1.0},
-        ],
-        "aliases": {
-            "cadastro_atualizado": ["cadastro atualizado"],
-            "vinculo": ["equipe vínculo", "equipe vinculo"],
-        },
-    },
-    "C2": {
-        "nome": "Desenvolvimento infantil",
-        "tipo": "pontuacao",
-        "descricao": "Boas práticas de cuidado no desenvolvimento infantil.",
-        "boas_praticas": [
-            {"key": "consulta", "label": "Consulta médica/enfermagem", "peso": 1.0},
-            {"key": "peso_altura", "label": "Peso/altura registrados", "peso": 1.0},
-            {"key": "visita", "label": "Visita domiciliar", "peso": 1.0},
-            {"key": "vacina", "label": "Vacinação em dia", "peso": 1.0},
-        ],
-        "aliases": {
-            "consulta": ["consulta médica/enfermagem", "consulta medica/enfermagem", "consulta"],
-            "peso_altura": ["peso/altura", "qtd. registros de peso/altura"],
-            "visita": ["visitas domiciliares", "qtd. visitas domiciliares"],
-            "vacina": ["vacina", "vacinação", "vacinacao em dia"],
-        },
-    },
-    "C3": {
-        "nome": "Gestação e puerpério",
-        "tipo": "pontuacao",
-        "descricao": "Boas práticas do cuidado na gestação e puerpério.",
-        "boas_praticas": [
-            {"key": "pre_natal", "label": "Pré-natal em acompanhamento", "peso": 1.0},
-            {"key": "consulta", "label": "Consulta médica/enfermagem", "peso": 1.0},
-            {"key": "odonto", "label": "Atendimento odontológico", "peso": 1.0},
-            {"key": "vacina", "label": "Vacinação/registro oportuno", "peso": 1.0},
-        ],
-        "aliases": {
-            "pre_natal": ["pré-natal", "pre natal", "prenatal"],
-            "consulta": ["consulta médica/enfermagem", "consulta"],
-            "odonto": ["odonto", "atendimento odontológico", "atendimento odontologico"],
-            "vacina": ["vacina", "imunização", "imunizacao"],
-        },
-    },
-    "C4": {
-        "nome": "Pessoa com diabetes",
-        "tipo": "pontuacao",
-        "descricao": "Boas práticas do cuidado com a pessoa com diabetes.",
-        "boas_praticas": [
-            {"key": "consulta", "label": "Consulta médica/enfermagem", "peso": 1.0},
-            {"key": "peso_altura", "label": "Peso/altura registrados", "peso": 1.0},
-            {"key": "hemoglobina", "label": "Hemoglobina glicada", "peso": 1.0},
-            {"key": "pes", "label": "Avaliação dos pés", "peso": 1.0},
-            {"key": "visita", "label": "Visita domiciliar", "peso": 1.0},
-            {"key": "acompanhado", "label": "Acompanhado", "peso": 1.0},
-        ],
-        "aliases": {
-            "consulta": ["consulta médica/enfermagem", "consulta medica/enfermagem"],
-            "peso_altura": ["qtd. registros de peso/altura", "peso/altura"],
-            "hemoglobina": ["hemoglobina glicada", "hb glicada", "hba1c"],
-            "pes": ["avaliação dos pés", "avaliacao dos pes", "pés", "pes"],
-            "visita": ["qtd. visitas domiciliares", "visitas domiciliares"],
-            "acompanhado": ["acompanhado"],
-        },
-    },
-    "C5": {
-        "nome": "Pessoa com hipertensão",
-        "tipo": "pontuacao",
-        "descricao": "Boas práticas do cuidado com a pessoa com hipertensão.",
-        "boas_praticas": [
-            {"key": "consulta", "label": "Consulta médica/enfermagem", "peso": 1.0},
-            {"key": "peso_altura", "label": "Peso/altura registrados", "peso": 1.0},
-            {"key": "visita", "label": "Visita domiciliar", "peso": 1.0},
-            {"key": "pressao", "label": "Aferição de pressão arterial", "peso": 1.0},
-            {"key": "acompanhado", "label": "Acompanhado", "peso": 1.0},
-        ],
-        "aliases": {
-            "consulta": ["consulta médica/enfermagem", "consulta medica/enfermagem"],
-            "peso_altura": ["qtd. registros de peso/altura", "peso/altura"],
-            "visita": ["qtd. visitas domiciliares", "visitas domiciliares"],
-            "pressao": ["aferição de pressão arterial", "afericao de pressao arterial", "pressão arterial"],
-            "acompanhado": ["acompanhado"],
-        },
-    },
-    "C6": {
-        "nome": "Pessoa idosa",
-        "tipo": "pontuacao",
-        "descricao": "Boas práticas do cuidado da pessoa idosa.",
-        "boas_praticas": [
-            {"key": "consulta", "label": "Consulta médica/enfermagem", "peso": 1.0},
-            {"key": "peso_altura", "label": "Peso/altura registrados", "peso": 1.0},
-            {"key": "visita", "label": "Visita domiciliar", "peso": 1.0},
-            {"key": "influenza", "label": "Vacina influenza", "peso": 1.0},
-        ],
-        "aliases": {
-            "consulta": ["consulta médica/enfermagem", "consulta medica/enfermagem"],
-            "peso_altura": ["qtd. registros de peso/altura", "peso/altura"],
-            "visita": ["qtd. visitas domiciliares", "visitas domiciliares"],
-            "influenza": ["vacina influenza", "influenza"],
-        },
-    },
-    "C7": {
-        "nome": "Mulher na prevenção do câncer",
-        "tipo": "pontuacao",
-        "descricao": "Boas práticas do cuidado da mulher na prevenção do câncer.",
-        "boas_praticas": [
-            {"key": "colo_utero", "label": "Rastreamento do câncer do colo do útero", "peso": 1.0},
-            {"key": "hpv", "label": "Vacina HPV entre 9 e 14 anos", "peso": 1.0},
-            {"key": "saude_reprodutiva", "label": "Atendimento em saúde reprodutiva", "peso": 1.0},
-            {"key": "mama", "label": "Rastreamento do câncer de mama", "peso": 1.0},
-            {"key": "acompanhado", "label": "Acompanhado", "peso": 1.0},
-        ],
-        "aliases": {
-            "colo_utero": ["rast. câncer do colo do útero", "rast. cancer do colo do utero", "colo do útero"],
-            "hpv": ["vacina hpv entre 9 e 14 anos", "vacina hpv", "hpv"],
-            "saude_reprodutiva": ["atend. saúde reprodutiva", "atend. saude reprodutiva", "saúde reprodutiva"],
-            "mama": ["rast. câncer de mama", "rast. cancer de mama", "câncer de mama"],
-            "acompanhado": ["acompanhado"],
-        },
-    },
-}
+# ---------------------
+# Utilitários básicos
+# ---------------------
 
-COMMON_ALIASES = {
-    "nome": ["nome completo", "nome"],
-    "cpf": ["cpf"],
-    "cns": ["cns"],
-    "data_nascimento": ["data nascimento", "data de nascimento"],
-    "idade": ["idade"],
-    "endereco": ["endereço", "endereco"],
-    "equipe_area": ["equipe área", "equipe area"],
-    "microarea": ["microárea", "microarea"],
-    "equipe_vinculo": ["equipe vínculo", "equipe vinculo"],
-    "cadastro_atualizado": ["cadastro atualizado"],
-    "data_atualizacao_cadastro": ["data atualização cadastro", "data atualizacao cadastro"],
-}
-
-# =========================
-# Utilitários
-# =========================
-def normalize_text(text: str) -> str:
-    if text is None:
-        return ""
-    text = str(text).strip().lower()
-    replacements = {
-        "á": "a", "à": "a", "â": "a", "ã": "a",
-        "é": "e", "ê": "e",
-        "í": "i",
-        "ó": "o", "ô": "o", "õ": "o",
-        "ú": "u",
-        "ç": "c",
-    }
-    for a, b in replacements.items():
-        text = text.replace(a, b)
-    text = re.sub(r"\s+", " ", text)
-    return text
+def strip_accents(text: str) -> str:
+    text = str(text)
+    return "".join(ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch))
 
 
-def find_column(columns: List[str], candidates: List[str]) -> str | None:
-    norm_cols = {normalize_text(c): c for c in columns}
-    for cand in candidates:
-        nc = normalize_text(cand)
-        if nc in norm_cols:
-            return norm_cols[nc]
-    for cand in candidates:
-        nc = normalize_text(cand)
-        for orig in columns:
-            if nc in normalize_text(orig):
-                return orig
-    return None
+def normalize_col(name: str) -> str:
+    name = strip_accents(str(name).strip().lower())
+    name = re.sub(r"[^a-z0-9]+", "_", name)
+    name = re.sub(r"_+", "_", name).strip("_")
+    return name
 
 
-def bool_from_value(val) -> int:
-    if pd.isna(val):
-        return 0
-    s = normalize_text(val)
-    if s in {"s", "sim", "true", "1", "ok", "x"}:
-        return 1
-    if s in {"n", "nao", "não", "false", "0", "-", ""}:
-        return 0
-    m = re.search(r"\d+", s)
-    if m:
-        return 1 if int(m.group()) > 0 else 0
-    return 0
+def to_bool(series: pd.Series) -> pd.Series:
+    if series.dtype == bool:
+        return series.fillna(False)
+    vals = series.astype(str).str.strip().str.lower()
+    return vals.isin(["1", "true", "sim", "s", "x", "ok", "yes"])
 
 
-def parse_uploaded_file(uploaded_file) -> pd.DataFrame:
-    name = uploaded_file.name.lower()
-    if name.endswith(".csv"):
-        return pd.read_csv(uploaded_file)
-    return pd.read_excel(uploaded_file)
+def parse_count(series: pd.Series) -> pd.Series:
+    vals = series.astype(str).str.strip().str.lower()
+    vals = vals.replace({"": np.nan, "nan": np.nan, "none": np.nan, "n/a": np.nan})
+    vals = vals.str.replace("+", "", regex=False)
+    return pd.to_numeric(vals, errors="coerce")
 
 
-def detect_indicator(df: pd.DataFrame) -> str | None:
-    cols = [normalize_text(c) for c in df.columns]
-    joined = " | ".join(cols)
-    if "pressao arterial" in joined:
-        return "C5"
-    if "hemoglobina glicada" in joined or "avaliacao dos pes" in joined or "avaliação dos pés" in joined:
-        return "C4"
-    if "cancer do colo do utero" in joined or "vacina hpv" in joined or "saude reprodutiva" in joined:
-        return "C7"
-    if "influenza" in joined:
-        return "C6"
-    return None
-
-
-def map_columns(df: pd.DataFrame, indicator_code: str) -> Dict[str, str]:
-    mapping = {}
-    for key, aliases in COMMON_ALIASES.items():
-        col = find_column(df.columns.tolist(), aliases)
-        if col:
-            mapping[key] = col
-    indicator = INDICATORS[indicator_code]
-    for bp in indicator["boas_praticas"]:
-        col = find_column(df.columns.tolist(), indicator["aliases"].get(bp["key"], [bp["label"]]))
-        if col:
-            mapping[bp["key"]] = col
-    return mapping
-
-
-def standardize_dataset(df: pd.DataFrame, indicator_code: str) -> pd.DataFrame:
-    mapping = map_columns(df, indicator_code)
-    out = pd.DataFrame()
-    base_fields = ["nome", "cpf", "cns", "data_nascimento", "idade", "endereco", "equipe_area", "microarea", "equipe_vinculo", "cadastro_atualizado", "data_atualizacao_cadastro"]
-    for field in base_fields:
-        out[field] = df[mapping[field]] if field in mapping else np.nan
-    indicator = INDICATORS[indicator_code]
-    for bp in indicator["boas_praticas"]:
-        source = mapping.get(bp["key"])
-        out[bp["key"]] = df[source].apply(bool_from_value) if source else 0
-    out["indicador"] = indicator_code
-    out["indicador_nome"] = indicator["nome"]
-    out["idade"] = pd.to_numeric(out["idade"], errors="coerce")
-    return out
-
-
-def compute_scores(df: pd.DataFrame, indicator_code: str) -> pd.DataFrame:
-    indicator = INDICATORS[indicator_code]
-    bp_keys = [bp["key"] for bp in indicator["boas_praticas"]]
-    total = len(bp_keys)
-    df = df.copy()
-    df["itens_ok"] = df[bp_keys].sum(axis=1)
-    df["itens_total"] = total
-    df["score_pct"] = np.where(total > 0, (df["itens_ok"] / total) * 100, 0)
-    if indicator_code == "C1":
-        df["acompanhado"] = np.where((df["cadastro_atualizado"].astype(str).str.upper() == "S") & (df["equipe_vinculo"].notna()), 1, 0)
-        df["score_pct"] = df["acompanhado"] * 100
-        df["itens_ok"] = df["acompanhado"]
-        df["itens_total"] = 1
+def ensure_columns(df: pd.DataFrame, columns: List[str], default=False) -> pd.DataFrame:
+    for c in columns:
+        if c not in df.columns:
+            df[c] = default
     return df
 
 
-def aggregate_team(df: pd.DataFrame) -> pd.DataFrame:
-    group_cols = [c for c in ["equipe_area", "equipe_vinculo", "microarea"] if c in df.columns]
-    if not group_cols:
-        group_cols = ["indicador_nome"]
-    agg = df.groupby(group_cols, dropna=False).agg(
-        pacientes=("nome", "count"),
-        media_score=("score_pct", "mean"),
-        acompanhados=("itens_ok", "sum"),
-    ).reset_index()
-    agg["media_score"] = agg["media_score"].round(1)
-    return agg.sort_values("media_score", ascending=False)
+def classificar_score(score: float) -> str:
+    if score >= 75:
+        return "Ótimo"
+    if score >= 50:
+        return "Bom"
+    if score >= 25:
+        return "Suficiente"
+    return "Regular"
 
 
-def data_quality_report(df: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    for col in df.columns:
-        miss = df[col].isna().sum()
-        empty = (df[col].astype(str).str.strip() == "").sum() if df[col].dtype == object else 0
-        rows.append({
-            "coluna": col,
-            "nulos": int(miss),
-            "vazios": int(empty),
-            "preenchimento_%": round((1 - ((miss + empty) / max(len(df), 1))) * 100, 1),
-        })
-    return pd.DataFrame(rows).sort_values(["preenchimento_%", "coluna"])
+def faixa_etaria(idade: float) -> str:
+    if pd.isna(idade):
+        return "Sem idade"
+    idade = int(idade)
+    if idade < 1:
+        return "<1"
+    if idade <= 4:
+        return "1-4"
+    if idade <= 9:
+        return "5-9"
+    if idade <= 14:
+        return "10-14"
+    if idade <= 19:
+        return "15-19"
+    if idade <= 39:
+        return "20-39"
+    if idade <= 59:
+        return "40-59"
+    return "60+"
 
 
-def sample_data(indicator_code: str) -> pd.DataFrame:
-    if indicator_code == "C5":
-        return pd.DataFrame([
-            {"Nome Completo": "Ana Silva", "CPF": "111", "CNS": "7001", "Data Nascimento": "1980-01-01", "Idade": 46, "Endereço": "Rua A", "Equipe Área": "Azul", "Microárea": "1", "Equipe Vínculo": "0001 - Azul", "Cadastro Atualizado": "S", "Data Atualização Cadastro": "2026-07-01", "Consulta Médica/Enfermagem": "S", "Qtd. Registros de peso/altura": 1, "Qtd. Visitas Domiciliares": 1, "Aferição de pressão arterial": "S", "Acompanhado": "S"},
-            {"Nome Completo": "João Souza", "CPF": "222", "CNS": "7002", "Data Nascimento": "1970-01-01", "Idade": 56, "Endereço": "Rua B", "Equipe Área": "Azul", "Microárea": "2", "Equipe Vínculo": "0001 - Azul", "Cadastro Atualizado": "N", "Data Atualização Cadastro": "2025-01-10", "Consulta Médica/Enfermagem": "N", "Qtd. Registros de peso/altura": 0, "Qtd. Visitas Domiciliares": 0, "Aferição de pressão arterial": "N", "Acompanhado": "N"},
-        ])
-    if indicator_code == "C7":
-        return pd.DataFrame([
-            {"Nome Completo": "Maria Costa", "CPF": "333", "CNS": "7003", "Data Nascimento": "1975-04-29", "Idade": 51, "Rast. Câncer do Colo do Útero": "S", "Vacina HPV entre 9 e 14 anos": "-", "Atend. Saúde Reprodutiva": "S", "Rast. Câncer de mama": "S", "Acompanhado": "S", "Endereço": "Rua C", "Equipe Área": "Ouro", "Microárea": "5", "Equipe Vínculo": "0002 - Ouro", "Cadastro Atualizado": "S", "Data Atualização Cadastro": "2026-05-26"},
-            {"Nome Completo": "Paula Lima", "CPF": "444", "CNS": "7004", "Data Nascimento": "1987-09-03", "Idade": 38, "Rast. Câncer do Colo do Útero": "N", "Vacina HPV entre 9 e 14 anos": "-", "Atend. Saúde Reprodutiva": "S", "Rast. Câncer de mama": "-", "Acompanhado": "N", "Endereço": "Rua D", "Equipe Área": "Ouro", "Microárea": "6", "Equipe Vínculo": "0002 - Ouro", "Cadastro Atualizado": "S", "Data Atualização Cadastro": "2026-07-17"},
-        ])
-    cols = {
-        "Nome Completo": ["Paciente A", "Paciente B"],
-        "CPF": ["123", "456"],
-        "CNS": ["7000", "7001"],
-        "Data Nascimento": ["1990-01-01", "1995-01-01"],
-        "Idade": [36, 31],
-        "Endereço": ["Rua X", "Rua Y"],
-        "Equipe Área": ["Equipe 1", "Equipe 1"],
-        "Microárea": ["1", "2"],
-        "Equipe Vínculo": ["0001 - Equipe 1", "0001 - Equipe 1"],
-        "Cadastro Atualizado": ["S", "S"],
-        "Data Atualização Cadastro": ["2026-06-01", "2026-06-10"],
+# ---------------------
+# Especificação de indicadores
+# ---------------------
+
+@dataclass
+class IndicatorSpec:
+    code: str
+    name: str
+    type: str  # "score" ou "percentual"
+    description: str
+    weights: Optional[Dict[str, int]] = None
+    non_conditionals: Optional[Dict[str, Callable[[pd.DataFrame], pd.Series]]] = None
+    applicability: Optional[Dict[str, str]] = None
+    numerator_col: Optional[str] = None
+    denominator_col: Optional[str] = None
+    entity_label: str = "pessoas"
+
+
+INDICATORS: Dict[str, IndicatorSpec] = {
+    "C1": IndicatorSpec(
+        "C1",
+        "Mais acesso na APS",
+        "percentual",
+        "Percentual de atendimentos programados em relação ao total de atendimentos válidos.",
+        numerator_col="demanda_programada",
+        denominator_col="atendimento_valido",
+        entity_label="atendimentos",
+    ),
+    "C2": IndicatorSpec(
+        "C2",
+        "Cuidado no desenvolvimento infantil",
+        "score",
+        "Monitoramento da criança com base em boas práticas registradas.",
+        weights={
+            "consulta_ok": 20,
+            "vacina_ok": 20,
+            "peso_altura_ok": 20,
+            "visita_ok": 20,
+            "desenvolvimento_ok": 20,
+        },
+        non_conditionals={
+            "visita_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index),
+        },
+        entity_label="crianças",
+    ),
+    "C3": IndicatorSpec(
+        "C3",
+        "Cuidado na gestação e puerpério",
+        "score",
+        "Pontuação por gestante/puérpera até 100 pontos.",
+        weights={
+            "pre_natal_12s_ok": 10,
+            "consultas_gest_ok": 9,
+            "pa_ok": 9,
+            "antropometria_ok": 9,
+            "visitas_gest_ok": 9,
+            "dtpa_ok": 9,
+            "tri1_ok": 9,
+            "tri3_ok": 9,
+            "puerperio_consulta_ok": 9,
+            "puerperio_visita_ok": 9,
+            "odonto_ok": 9,
+        },
+        non_conditionals={
+            "visitas_gest_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index),
+            "puerperio_visita_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index),
+        },
+        entity_label="gestantes/puérperas",
+    ),
+    "C4": IndicatorSpec(
+        "C4",
+        "Cuidado da pessoa com diabetes",
+        "score",
+        "Pontuação por pessoa com diabetes até 100 pontos.",
+        weights={
+            "consulta_ok": 20,
+            "hba1c_ok": 20,
+            "solicitacao_ok": 15,
+            "pes_ok": 15,
+            "retina_ok": 15,
+            "visita_ok": 15,
+        },
+        non_conditionals={
+            "visita_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index),
+        },
+        entity_label="pessoas com diabetes",
+    ),
+    "C5": IndicatorSpec(
+        "C5",
+        "Cuidado da pessoa com hipertensão",
+        "score",
+        "Pontuação por pessoa com hipertensão até 100 pontos.",
+        weights={
+            "consulta_ok": 25,
+            "pa_ok": 25,
+            "antropometria_ok": 25,
+            "visita_ok": 25,
+        },
+        non_conditionals={
+            "visita_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index),
+        },
+        entity_label="pessoas com hipertensão",
+    ),
+    "C6": IndicatorSpec(
+        "C6",
+        "Cuidado da pessoa idosa",
+        "score",
+        "Pontuação por pessoa idosa até 100 pontos.",
+        weights={
+            "consulta_ok": 25,
+            "antropometria_ok": 25,
+            "visitas_ok": 25,
+            "influenza_ok": 25,
+        },
+        non_conditionals={
+            "visitas_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index),
+        },
+        entity_label="pessoas idosas",
+    ),
+    "C7": IndicatorSpec(
+        "C7",
+        "Cuidado da mulher na prevenção do câncer",
+        "score",
+        "Pontuação por mulher elegível conforme faixa etária e práticas aplicáveis.",
+        weights={
+            "colo_utero_ok": 20,
+            "hpv_ok": 30,
+            "saude_reprodutiva_ok": 30,
+            "mama_ok": 20,
+        },
+        applicability={
+            "colo_utero_ok": "colo_utero_aplicavel",
+            "hpv_ok": "hpv_aplicavel",
+            "saude_reprodutiva_ok": "saude_reprodutiva_aplicavel",
+            "mama_ok": "mama_aplicavel",
+        },
+        entity_label="mulheres",
+    ),
+}
+
+# Descrições de boas práticas (parciais, ajustáveis)
+BOA_PRATICA_LABELS = {
+    "C4": {
+        "consulta_ok": "Consulta semestral para avaliação de risco, adesão e prescrição",
+        "hba1c_ok": "Solicitação ou avaliação de hemoglobina glicada em 12 meses",
+        "pes_ok": "Avaliação dos pés em 12 meses",
+        "visita_ok": "Duas visitas domiciliares em 12 meses (ACS/TACS)",
+        "pa_ok": "Aferição de pressão arterial em 6 meses",
+        "antropometria_ok": "Registro de peso e altura em 12 meses",
+    },
+    "C5": {
+        "consulta_ok": "Consulta semestral para acompanhamento da pessoa com hipertensão",
+        "pa_ok": "Aferição de pressão arterial em 6 meses",
+        "antropometria_ok": "Peso e altura registrados em 12 meses",
+        "visita_ok": "Duas visitas domiciliares em 12 meses (ACS/TACS)",
+    },
+    "C6": {
+        "consulta_ok": "Consulta em 12 meses por médico ou enfermeiro",
+        "antropometria_ok": "Peso e altura registrados no mesmo dia em 12 meses",
+        "visitas_ok": "Duas visitas domiciliares em 12 meses (ACS/TACS)",
+        "influenza_ok": "Dose de vacina influenza em 12 meses",
+    },
+}
+
+
+def label_boa_pratica(indicator_code: str, col: str) -> str:
+    return BOA_PRATICA_LABELS.get(indicator_code, {}).get(col, col.replace("_", " ").capitalize())
+
+
+# ---------------------
+# Cálculo de indicadores
+# ---------------------
+
+def calculate_score_indicator(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
+    df = df.copy()
+    weights = spec.weights or {}
+    non_conditionals = spec.non_conditionals or {}
+    applicability = spec.applicability or {}
+
+    for c in list(weights.keys()) + list(applicability.values()):
+        if c not in df.columns:
+            df[c] = False
+
+    total_score = np.zeros(len(df), dtype=float)
+    total_pendencias = np.zeros(len(df), dtype=int)
+    total_aplicaveis = np.zeros(len(df), dtype=int)
+
+    for col, weight in weights.items():
+        pratica_ok = to_bool(df[col])
+        aplicavel = pd.Series(True, index=df.index)
+        if col in applicability:
+            aplicavel &= to_bool(df[applicability[col]])
+        if col in non_conditionals:
+            aplicavel &= ~non_conditionals[col](df).fillna(False).astype(bool)
+
+        total_score += np.where(aplicavel & pratica_ok, weight, 0)
+        total_pendencias += np.where(aplicavel & ~pratica_ok, 1, 0)
+        total_aplicaveis += np.where(aplicavel, 1, 0)
+
+    df["score"] = total_score
+    df["pendencias"] = total_pendencias
+    df["praticas_aplicaveis"] = total_aplicaveis
+    df["classificacao"] = df["score"].apply(classificar_score)
+    return df
+
+
+def calculate_percent_indicator(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
+    df = df.copy()
+    ensure_columns(df, [spec.numerator_col, spec.denominator_col], default=False)
+    df[spec.numerator_col] = to_bool(df[spec.numerator_col])
+    df[spec.denominator_col] = to_bool(df[spec.denominator_col])
+    return df
+
+
+def read_uploaded_file(uploaded_file) -> pd.DataFrame:
+    suffix = uploaded_file.name.lower()
+    if suffix.endswith(".csv"):
+        for enc in ["utf-8", "latin1", "cp1252"]:
+            uploaded_file.seek(0)
+            try:
+                return pd.read_csv(uploaded_file, encoding=enc)
+            except Exception:
+                pass
+        uploaded_file.seek(0)
+        return pd.read_csv(uploaded_file)
+    if suffix.endswith(".xlsx") or suffix.endswith(".xls"):
+        uploaded_file.seek(0)
+        return pd.read_excel(uploaded_file)
+    raise ValueError("Formato não suportado. Envie CSV, XLSX ou XLS.")
+
+
+def preprocess_df(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df.columns = [normalize_col(c) for c in df.columns]
+
+    alias_map = {
+        "usuario": "nome",
+        "paciente": "nome",
+        "microarea": "micro_area",
+        "ine": "equipe_ine",
+        "equipe_saude": "equipe",
+        "nome_equipe": "equipe",
+        "ubs": "unidade",
+        "nome_ubs": "unidade",
+        "sexo_paciente": "sexo",
+        "data_de_nascimento": "data_nascimento",
+        "dt_nascimento": "data_nascimento",
+        "nascimento": "data_nascimento",
+        "logradouro": "endereco",
+        "endereco": "endereco",
+        "endereco_paciente": "endereco",
+        "localizacao": "endereco",
     }
-    for bp in INDICATORS[indicator_code]["boas_praticas"]:
-        label = bp["label"]
-        cols[label] = ["S", "N"]
-    return pd.DataFrame(cols)
+    for old, new in alias_map.items():
+        if old in df.columns and new not in df.columns:
+            df[new] = df[old]
+
+    if "idade" in df.columns:
+        df["idade"] = pd.to_numeric(df["idade"], errors="coerce")
+    else:
+        df["idade"] = np.nan
+
+    for c in ["nome", "equipe", "unidade", "tipo_equipe", "sexo", "cns", "cpf", "micro_area", "equipe_ine", "data_nascimento", "endereco"]:
+        if c not in df.columns:
+            df[c] = ""
+
+    if "data_nascimento" in df.columns:
+        dt = pd.to_datetime(df["data_nascimento"], errors="coerce")
+        formatted = dt.dt.strftime("%d/%m/%Y")
+        original = df["data_nascimento"].astype(str)
+        df["data_nascimento"] = np.where(dt.notna(), formatted, original)
+
+    df["faixa_etaria"] = df["idade"].apply(faixa_etaria)
+    return df
 
 
-def to_excel_bytes(df_dict: Dict[str, pd.DataFrame]) -> bytes:
+# ---------------------
+# Painel de boas práticas
+# ---------------------
+
+def build_good_practices_df(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
+    rows = []
+    weights = spec.weights or {}
+    non_conditionals = spec.non_conditionals or {}
+    applicability = spec.applicability or {}
+
+    for col, peso in weights.items():
+        if col not in df.columns:
+            continue
+        aplicavel = pd.Series(True, index=df.index)
+        if col in applicability:
+            aplicavel &= to_bool(df[applicability[col]])
+        if col in non_conditionals:
+            aplicavel &= ~non_conditionals[col](df).fillna(False).astype(bool)
+
+        total_aplicavel = int(aplicavel.sum())
+        realizados = int((aplicavel & to_bool(df[col])).sum())
+        nao_realizados = max(total_aplicavel - realizados, 0)
+        perc = round((realizados / total_aplicavel) * 100, 1) if total_aplicavel else 0.0
+
+        rows.append({
+            "boa_pratica": label_boa_pratica(spec.code, col),
+            "coluna": col,
+            "peso": peso,
+            "realizados": realizados,
+            "percentual_realizado": perc,
+            "nao_realizados": nao_realizados,
+        })
+
+    return pd.DataFrame(rows)
+
+
+def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
+    bp_df = build_good_practices_df(df, spec)
+    st.markdown("### Cumprimento das boas práticas")
+
+    st.markdown(
+        """
+        <style>
+        .bp-card {
+            background: linear-gradient(180deg, #f7fbfb 0, #eef7f7 100%);
+            border: 1px solid #d9ecec;
+            border-radius: 18px;
+            padding: 18px 18px 10px 18px;
+            box-shadow: 0 8px 26px rgba(1,105,111,0.08);
+            margin-bottom: 12px;
+        }
+        .bp-title {
+            font-size: 1.12rem;
+            font-weight: 700;
+            color: #0f3638;
+            margin-bottom: 6px;
+        }
+        .bp-sub {
+            font-size: 0.93rem;
+            color: #476466;
+            margin-bottom: 14px;
+        }
+        </style>
+        <div class="bp-card">
+            <div class="bp-title">Painel analítico das boas práticas</div>
+            <div class="bp-sub">Resumo por prática com peso, quantidade realizada, percentual realizado e quantidade pendente.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col_table, col_chart = st.columns([1.45, 1])
+
+    view = bp_df.copy()
+    view["percentual_realizado"] = view["percentual_realizado"].map(lambda x: f"{x:.1f}%")
+    col_table.dataframe(
+        view[["boa_pratica", "peso", "realizados", "percentual_realizado", "nao_realizados"]],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    if not bp_df.empty:
+        fig = px.bar(
+            bp_df.sort_values("percentual_realizado", ascending=True),
+            x="percentual_realizado",
+            y="boa_pratica",
+            orientation="h",
+            text="percentual_realizado",
+            color="percentual_realizado",
+            color_continuous_scale=["#cfe8e8", "#4f98a3", "#01696f"],
+            title="Percentual realizado por boa prática",
+        )
+        fig.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+        fig.update_layout(
+            height=max(380, len(bp_df) * 72),
+            coloraxis_showscale=False,
+            margin=dict(l=10, r=10, t=50, b=10),
+        )
+        col_chart.plotly_chart(fig, use_container_width=True)
+
+
+# ---------------------
+# Resumo executivo
+# ---------------------
+
+def indicator_summary(df: pd.DataFrame, spec: IndicatorSpec) -> Dict[str, float]:
+    if spec.type == "percentual":
+        denom = int(to_bool(df[spec.denominator_col]).sum()) if len(df) else 0
+        numer = int((to_bool(df[spec.denominator_col]) & to_bool(df[spec.numerator_col])).sum()) if len(df) else 0
+        resultado = round((numer / denom) * 100, 1) if denom else 0.0
+        return {
+            "entidades": len(df),
+            "denominador": denom,
+            "numerador": numer,
+            "resultado": resultado,
+            "classificacao": classificar_score(resultado),
+        }
+    return {
+        "entidades": len(df),
+        "score_medio": round(df["score"].mean(), 1) if len(df) else 0.0,
+        "score_max": round(df["score"].max(), 1) if len(df) else 0.0,
+        "com_pendencias": int((df["pendencias"] > 0).sum()) if len(df) else 0,
+        "classificacao": classificar_score(round(df["score"].mean(), 1) if len(df) else 0.0),
+    }
+
+
+def render_summary(df: pd.DataFrame, spec: IndicatorSpec):
+    summary = indicator_summary(df, spec)
+
+    st.markdown(f"## {spec.code} — {spec.name}")
+    st.caption("Desempenho categorizado em Ótimo, Bom, Suficiente e Regular conforme notas metodológicas.")
+
+    st.markdown(
+        """
+        <style>
+        .metric-card-wrap {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin: 12px 0 24px 0;
+        }
+        .metric-card {
+            background: linear-gradient(180deg, #f8fbfb 0, #eef6f6 100%);
+            border: 1px solid rgba(1,105,111,.12);
+            border-radius: 18px;
+            padding: 18px 18px 16px 18px;
+            box-shadow: 0 8px 24px rgba(1,105,111,.08);
+        }
+        .metric-label {
+            font-size: .82rem;
+            color: #4a6668;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        .metric-value {
+            font-size: 1.9rem;
+            color: #0f3638;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+        .metric-help {
+            font-size: .78rem;
+            color: #6f7f80;
+            margin-top: 6px;
+        }
+        @media (max-width: 900px) {
+            .metric-card-wrap { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 640px) {
+            .metric-card-wrap { grid-template-columns: 1fr; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if spec.type == "percentual":
+        cards = [
+            ("Total de Pacientes", summary["entidades"], spec.entity_label),
+            ("Score", f"{summary['resultado']:.1f}", "resultado médio do indicador"),
+            ("Desempenho", summary["classificacao"], "classificação metodológica (0-100 pontos)"),
+        ]
+    else:
+        cards = [
+            ("Total de Pacientes", summary["entidades"], spec.entity_label),
+            ("Score", summary["score_medio"], "score médio (0-100 pontos)"),
+            ("Desempenho", summary["classificacao"], "classificação metodológica (0-100 pontos)"),
+        ]
+
+    html_cards = "<div class='metric-card-wrap'>" + "".join(
+        f"<div class='metric-card'>"
+        f"<div class='metric-label'>{label}</div>"
+        f"<div class='metric-value'>{value}</div>"
+        f"<div class='metric-help'>{helptext}</div>"
+        f"</div>"
+        for (label, value, helptext) in cards
+    ) + "</div>"
+    st.markdown(html_cards, unsafe_allow_html=True)
+
+
+# ---------------------
+# Filtros
+# ---------------------
+
+def apply_filters(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
+    with st.sidebar:
+        st.subheader("Filtros")
+        equipes = sorted(x for x in df["equipe"].dropna().astype(str).unique() if x)
+        unidades = sorted(x for x in df["unidade"].dropna().astype(str).unique() if x)
+        microareas = sorted(x for x in df["micro_area"].dropna().astype(str).unique() if x)
+        faixas = sorted(x for x in df["faixa_etaria"].dropna().astype(str).unique() if x)
+
+        eq_sel = st.multiselect("Por equipe", equipes)
+        un_sel = st.multiselect("Por unidade", unidades)
+        ma_sel = st.multiselect("Por microárea", microareas)
+        fx_sel = st.multiselect("Por faixa etária", faixas)
+
+        pendencias_opts = ["Todos"]
+        weight_cols = list((spec.weights or {}).keys())
+        if weight_cols:
+            pendencias_opts += ["Sem pendências"] + weight_cols
+        pend_sel = st.selectbox("Por pendências", pendencias_opts)
+
+    out = df.copy()
+    if eq_sel:
+        out = out[out["equipe"].astype(str).isin(eq_sel)]
+    if un_sel:
+        out = out[out["unidade"].astype(str).isin(un_sel)]
+    if ma_sel:
+        out = out[out["micro_area"].astype(str).isin(ma_sel)]
+    if fx_sel:
+        out = out[out["faixa_etaria"].astype(str).isin(fx_sel)]
+
+    if pend_sel == "Sem pendências" and "pendencias" in out.columns:
+        out = out[out["pendencias"] == 0]
+    elif pend_sel in weight_cols:
+        col = pend_sel
+        if col in out.columns:
+            out = out[~to_bool(out[col])]  # pacientes com a boa prática não realizada
+
+    return out
+
+
+# ---------------------
+# Exportação
+# ---------------------
+
+def export_results(df: pd.DataFrame):
+    csv = df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button("Baixar resultado em CSV", csv, "saude360_resultado.csv", "text/csv")
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        for sheet_name, dfx in df_dict.items():
-            dfx.to_excel(writer, index=False, sheet_name=sheet_name[:31])
-    return output.getvalue()
-
-
-# =========================
-# Interface
-# =========================
-st.title("Saúde 360 - Painel Integrado dos 7 Indicadores")
-st.caption("Base modular para monitoramento nominal, desempenho por equipe e qualidade dos dados.")
-
-with st.sidebar:
-    st.header("Configuração")
-    modo_demo = st.toggle("Usar dados de demonstração", value=True)
-    indicador_manual = st.selectbox(
-        "Indicador principal",
-        options=list(INDICATORS.keys()),
-        format_func=lambda x: f"{x} - {INDICATORS[x]['nome']}",
-        index=4,
-    )
-    uploaded_files = st.file_uploader(
-        "Envie uma ou mais planilhas (.xls, .xlsx, .csv)",
-        type=["xls", "xlsx", "csv"],
-        accept_multiple_files=True,
-    )
-
-st.markdown("### Visão geral")
-cols = st.columns(4)
-cols[0].metric("Indicadores", len(INDICATORS))
-cols[1].metric("Tipo principal", "Pontuação")
-cols[2].metric("Upload múltiplo", "Sim")
-cols[3].metric("Exportação", "CSV / XLSX")
-
-# Carregamento
-frames = []
-source_info = []
-if uploaded_files:
-    for up in uploaded_files:
-        try:
-            raw = parse_uploaded_file(up)
-            detected = detect_indicator(raw) or indicador_manual
-            std = standardize_dataset(raw, detected)
-            calc = compute_scores(std, detected)
-            frames.append(calc)
-            source_info.append({"arquivo": up.name, "indicador": detected, "linhas": len(calc)})
-        except Exception as e:
-            st.error(f"Erro ao ler {up.name}: {e}")
-
-if not frames and modo_demo:
-    for code in INDICATORS:
-        raw = sample_data(code)
-        std = standardize_dataset(raw, code)
-        calc = compute_scores(std, code)
-        frames.append(calc)
-        source_info.append({"arquivo": f"demo_{code}.xlsx", "indicador": code, "linhas": len(calc)})
-
-if not frames:
-    st.info("Envie pelo menos uma planilha ou habilite os dados de demonstração.")
-    st.stop()
-
-master = pd.concat(frames, ignore_index=True)
-source_df = pd.DataFrame(source_info)
-
-# Filtros
-st.markdown("## Filtros")
-fc1, fc2, fc3 = st.columns(3)
-inds = fc1.multiselect("Indicadores", options=sorted(master["indicador"].dropna().unique()), default=sorted(master["indicador"].dropna().unique()))
-equipes = fc2.multiselect("Equipe área", options=sorted(master["equipe_area"].dropna().astype(str).unique()), default=sorted(master["equipe_area"].dropna().astype(str).unique())[:10])
-score_min = fc3.slider("Score mínimo", 0, 100, 0)
-
-filtered = master[master["indicador"].isin(inds)].copy()
-if equipes:
-    filtered = filtered[filtered["equipe_area"].astype(str).isin(equipes)]
-filtered = filtered[filtered["score_pct"] >= score_min]
-
-# KPIs
-st.markdown("## Painel executivo")
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("Pacientes", int(len(filtered)))
-k2.metric("Média geral", f"{filtered['score_pct'].mean():.1f}%")
-k3.metric("Equipes", int(filtered['equipe_area'].nunique()))
-k4.metric("Arquivos", int(len(source_df)))
-
-# Abas
-aba1, aba2, aba3, aba4, aba5, aba6 = st.tabs([
-    "Resumo",
-    "Por indicador",
-    "Por equipe",
-    "Nominal",
-    "Qualidade dos dados",
-    "Exportação",
-])
-
-with aba1:
-    st.dataframe(source_df, use_container_width=True)
-    resumo = filtered.groupby(["indicador", "indicador_nome"], dropna=False).agg(
-        pacientes=("nome", "count"),
-        media_score=("score_pct", "mean"),
-    ).reset_index()
-    resumo["media_score"] = resumo["media_score"].round(1)
-    st.dataframe(resumo, use_container_width=True)
-    st.bar_chart(resumo.set_index("indicador_nome")["media_score"])
-
-with aba2:
-    indicador_sel = st.selectbox(
-        "Selecione o indicador",
-        options=sorted(filtered["indicador"].unique()),
-        format_func=lambda x: f"{x} - {INDICATORS[x]['nome']}",
-        key="indicador_tab",
-    )
-    sub = filtered[filtered["indicador"] == indicador_sel].copy()
-    st.write(INDICATORS[indicador_sel]["descricao"])
-    bps = [bp["key"] for bp in INDICATORS[indicador_sel]["boas_praticas"]]
-    bp_labels = {bp["key"]: bp["label"] for bp in INDICATORS[indicador_sel]["boas_praticas"]}
-    bp_df = pd.DataFrame({
-        "boa_pratica": [bp_labels[k] for k in bps],
-        "adesao_%": [round(sub[k].mean() * 100, 1) if len(sub) else 0 for k in bps],
-    })
-    st.dataframe(bp_df, use_container_width=True)
-    st.bar_chart(bp_df.set_index("boa_pratica")["adesao_%"])
-
-with aba3:
-    equipe_agg = aggregate_team(filtered)
-    st.dataframe(equipe_agg, use_container_width=True)
-    cols_chart = [c for c in ["equipe_area", "equipe_vinculo"] if c in equipe_agg.columns]
-    idx = cols_chart[0] if cols_chart else equipe_agg.columns[0]
-    st.bar_chart(equipe_agg.set_index(idx)["media_score"])
-
-with aba4:
-    view_cols = [c for c in ["indicador", "indicador_nome", "nome", "idade", "equipe_area", "microarea", "equipe_vinculo", "score_pct", "itens_ok", "itens_total"] if c in filtered.columns]
-    st.dataframe(filtered[view_cols].sort_values(["indicador", "score_pct"], ascending=[True, False]), use_container_width=True)
-    csv_bytes = filtered.to_csv(index=False).encode("utf-8-sig")
-    st.download_button("Baixar nominal filtrado (CSV)", data=csv_bytes, file_name="saude360_nominal_filtrado.csv", mime="text/csv")
-
-with aba5:
-    dq = data_quality_report(filtered)
-    st.dataframe(dq, use_container_width=True)
-    st.bar_chart(dq.set_index("coluna")["preenchimento_%"])
-
-with aba6:
-    st.markdown("### Exportações")
-    resumo_export = filtered.groupby(["indicador", "indicador_nome"], dropna=False).agg(
-        pacientes=("nome", "count"), media_score=("score_pct", "mean")
-    ).reset_index()
-    equipe_export = aggregate_team(filtered)
-    xlsx = to_excel_bytes({
-        "base_filtrada": filtered,
-        "resumo_indicador": resumo_export,
-        "resumo_equipe": equipe_export,
-        "fontes": source_df,
-    })
+        df.to_excel(writer, index=False, sheet_name="resultado")
+    xlsx = output.getvalue()
     st.download_button(
-        "Baixar pacote Excel",
-        data=xlsx,
-        file_name="saude360_exportacoes.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Baixar resultado em Excel",
+        xlsx,
+        "saude360_resultado.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
-    st.markdown("### Modelo de planilha")
-    template_indicator = st.selectbox(
-        "Gerar modelo para",
-        options=list(INDICATORS.keys()),
-        format_func=lambda x: f"{x} - {INDICATORS[x]['nome']}",
-        key="template_indicator",
-    )
-    template_df = sample_data(template_indicator)
-    template_csv = template_df.to_csv(index=False).encode("utf-8-sig")
-    st.download_button(
-        "Baixar modelo CSV",
-        data=template_csv,
-        file_name=f"modelo_{template_indicator.lower()}.csv",
-        mime="text/csv",
-    )
 
-st.markdown("---")
-st.markdown(
-    "**Observação técnica:** esta base usa parser flexível por nomes de colunas e foi desenhada para ser refinada com os relatórios reais da secretaria."
-)
+# ---------------------
+# App principal (layout único)
+# ---------------------
+
+def main():
+    st.title("Saúde 360 APS")
+    st.caption("Leitura de uma planilha por vez, com painel único por indicador.")
+
+    with st.sidebar:
+        st.header("Configuração")
+        indicator_code = st.selectbox(
+            "Indicador",
+            list(INDICATORS.keys()),
+            format_func=lambda x: f"{x} - {INDICATORS[x].name}",
+        )
+        data_mode = st.radio("Origem dos dados", ["Enviar planilha", "Usar dados de demonstração"], index=0)
+
+    spec = INDICATORS[indicator_code]
+    st.info(spec.description)
+
+    if data_mode == "Usar dados de demonstração":
+        st.warning("Dados de demonstração ainda não configurados para todos os indicadores. Use uma planilha real.")
+        uploaded_file = None
+    else:
+        uploaded_file = st.file_uploader("Envie a planilha .csv, .xls, .xlsx referente a ESTE indicador", type=["csv", "xls", "xlsx"])
+
+    if uploaded_file is None:
+        st.warning("Envie uma planilha para continuar.")
+        return
+
+    try:
+        raw_df = read_uploaded_file(uploaded_file)
+    except Exception as e:
+        st.error(f"Erro ao ler arquivo: {e}")
+        return
+
+    df = preprocess_df(raw_df)
+    if spec.type == "percentual":
+        df = calculate_percent_indicator(df, spec)
+    else:
+        df = calculate_score_indicator(df, spec)
+
+    df = apply_filters(df, spec)
+
+    render_summary(df, spec)
+    render_good_practices(df, spec)
+
+    st.markdown("### Lista nominal")
+    nominal_cols = [
+        "nome",
+        "data_nascimento",
+        "idade",
+        "faixa_etaria",
+        "endereco",
+        "sexo",
+        "micro_area",
+        "unidade",
+        "equipe",
+        "cns",
+        "cpf",
+        "score" if "score" in df.columns else None,
+        "classificacao" if "classificacao" in df.columns else None,
+    ]
+    nominal_cols = [c for c in nominal_cols if c in df.columns]
+    st.dataframe(df[nominal_cols], use_container_width=True, height=520)
+
+    export_results(df)
+
+
+if __name__ == "__main__":
+    main()
