@@ -16,10 +16,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-
 # =========================
 # Utilidades
 # =========================
+
 def strip_accents(text: str) -> str:
     text = str(text)
     return "".join(
@@ -109,6 +109,7 @@ def infer_tipo_equipe_from_text(series: pd.Series) -> pd.Series:
 # =========================
 # Especificações dos indicadores
 # =========================
+
 @dataclass
 class IndicatorSpec:
     code: str
@@ -125,46 +126,46 @@ class IndicatorSpec:
 
 BOA_PRATICA_LABELS = {
     "C1": {
-        "cadastro_ok": "Cadastro individual atualizado e vínculo ativo no território",
-        "atendimento_ok": "Pessoa acompanhada/atendida conforme relatório operacional",
+        "cadastro_ok": "Cadastro individual atualizado e vínculo ativo",
+        "atendimento_ok": "Pessoa acompanhada/atendida no período",
     },
     "C2": {
         "consulta_ok": "Consulta da criança registrada no período",
-        "vacina_ok": "Vacinação/aplicação preventiva registrada no período",
-        "antropometria_ok": "Peso e altura registrados para acompanhamento do desenvolvimento",
-        "visita_ok": "Visita domiciliar/acompanhamento territorial registrado",
+        "vacina_ok": "Vacinação/aplicação preventiva registrada",
+        "antropometria_ok": "Peso e altura registrados",
+        "visita_ok": "Visita domiciliar/acompanhamento territorial",
     },
     "C3": {
-        "consulta_ok": "Consulta de pré-natal/puerpério registrada no período",
+        "consulta_ok": "Consulta de pré-natal/puerpério registrada",
         "pa_ok": "Aferição de pressão arterial registrada",
-        "antropometria_ok": "Peso e/ou avaliação antropométrica registrada",
+        "antropometria_ok": "Peso/avaliação antropométrica registrada",
         "visita_ok": "Visitas domiciliares registradas",
-        "exame_ok": "Exame/solicitação importante registrado no período",
+        "exame_ok": "Exames/solicitações relevantes registradas",
     },
     "C4": {
-        "consulta_ok": "Realizar ao menos uma consulta semestral, presencial ou remota",
-        "pa_ok": "Registrar ao menos uma aferição de pressão arterial nos últimos 6 meses",
-        "antropometria_ok": "Registrar peso e altura para avaliação antropométrica nos últimos 12 meses",
-        "visita_ok": "Realizar ao menos duas visitas domiciliares por ACS/TACS, nos últimos 12 meses",
-        "hba1c_ok": "Registrar solicitação ou avaliação de hemoglobina glicada nos últimos 12 meses",
-        "pes_ok": "Realizar avaliação dos pés nos últimos 12 meses",
+        "consulta_ok": "Consulta semestral presencial ou remota",
+        "pa_ok": "Aferição de pressão arterial em 6 meses",
+        "antropometria_ok": "Peso e altura em 12 meses",
+        "visita_ok": "Duas visitas domiciliares em 12 meses",
+        "hba1c_ok": "Hemoglobina glicada em 12 meses",
+        "pes_ok": "Avaliação dos pés em 12 meses",
     },
     "C5": {
-        "consulta_ok": "Realizar ao menos uma consulta semestral, presencial ou remota",
-        "pa_ok": "Registrar ao menos uma aferição de pressão arterial nos últimos 6 meses",
-        "antropometria_ok": "Registrar peso e altura para avaliação antropométrica nos últimos 12 meses",
-        "visita_ok": "Realizar ao menos duas visitas domiciliares por ACS/TACS, nos últimos 12 meses",
+        "consulta_ok": "Consulta semestral para hipertensão",
+        "pa_ok": "Aferição de pressão arterial em 6 meses",
+        "antropometria_ok": "Peso e altura em 12 meses",
+        "visita_ok": "Duas visitas domiciliares em 12 meses",
     },
     "C6": {
-        "consulta_ok": "Registrar consulta presencial ou remota por médico ou enfermeiro",
-        "antropometria_ok": "Registrar peso e altura no mesmo dia para avaliação antropométrica",
-        "visitas_ok": "Realizar ao menos duas visitas domiciliares por ACS/TACS",
-        "influenza_ok": "Registrar uma dose da vacina contra influenza nos últimos 12 meses",
+        "consulta_ok": "Consulta anual por médico ou enfermeiro",
+        "antropometria_ok": "Peso e altura no mesmo dia",
+        "visitas_ok": "Duas visitas domiciliares em 12 meses",
+        "influenza_ok": "Dose de vacina influenza em 12 meses",
     },
     "C7": {
-        "citopatologico_ok": "Citopatológico/ação preventiva registrado",
-        "mamografia_ok": "Mamografia/ação correlata registrada quando aplicável",
-        "consulta_ok": "Consulta de cuidado/prevenção registrada no período",
+        "citopatologico_ok": "Citopatológico/ação preventiva registrada",
+        "mamografia_ok": "Mamografia/ação correlata registrada",
+        "consulta_ok": "Consulta de cuidado/prevenção registrada",
         "visita_ok": "Acompanhamento domiciliar/territorial registrado",
     },
 }
@@ -190,7 +191,6 @@ INDICATORS: Dict[str, IndicatorSpec] = {
         type="score",
         description="Painel operacional local para acompanhamento do desenvolvimento infantil.",
         weights={"consulta_ok": 30, "vacina_ok": 25, "antropometria_ok": 25, "visita_ok": 20},
-        non_conditionals={},
         entity_label="crianças acompanhadas",
     ),
     "C3": IndicatorSpec(
@@ -199,7 +199,6 @@ INDICATORS: Dict[str, IndicatorSpec] = {
         type="score",
         description="Painel operacional local para gestantes e puérperas.",
         weights={"consulta_ok": 30, "pa_ok": 20, "antropometria_ok": 15, "visita_ok": 15, "exame_ok": 20},
-        non_conditionals={},
         entity_label="gestantes/puérperas",
     ),
     "C4": IndicatorSpec(
@@ -235,7 +234,6 @@ INDICATORS: Dict[str, IndicatorSpec] = {
         type="score",
         description="Painel operacional local para prevenção do câncer da mulher.",
         weights={"citopatologico_ok": 35, "mamografia_ok": 25, "consulta_ok": 20, "visita_ok": 20},
-        non_conditionals={},
         entity_label="mulheres acompanhadas",
     ),
 }
@@ -244,6 +242,7 @@ INDICATORS: Dict[str, IndicatorSpec] = {
 # =========================
 # Leitura e identificação
 # =========================
+
 def read_uploaded_file(uploaded_file) -> pd.DataFrame:
     suffix = uploaded_file.name.lower()
     if suffix.endswith(".csv"):
@@ -284,6 +283,7 @@ def detect_indicator_from_columns(df: pd.DataFrame, filename: str) -> Optional[s
 # =========================
 # Pré-processamento genérico
 # =========================
+
 def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.DataFrame:
     df = df.copy()
     df.columns = [normalize_col(c) for c in df.columns]
@@ -365,13 +365,13 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
     df["numerador_c1"] = (df["cadastro_ok"] | df["atendimento_ok"]).astype(int)
     df["denominador_c1"] = 1
 
-    # C2 - desenvolvimento infantil (operacional local)
+    # C2 - desenvolvimento infantil (ajustes operacionais simples)
     if indicator_code == "C2" or (indicator_code is None and df["idade"].notna().any()):
-        df["vacina_ok"] = to_bool(df["vacina_influenza"]) if "vacina_influenza" in df.columns else False
+        df["vacina_ok"] = to_bool(df["vacina_influenza"]) if "vacina_influenza" in df.columns else df.get("vacina_ok", False)
         if "acompanhado" in df.columns:
             df["vacina_ok"] = df["vacina_ok"] | to_bool(df["acompanhado"])
 
-    # C3 - gestação/puerpério (operacional local)
+    # C3 - gestação/puerpério (exame_ok genérico)
     df["exame_ok"] = False
     possible_exam_cols = [c for c in df.columns if any(k in c for k in ["exame", "teste", "hemoglobina", "citopatologico", "mamografia"])]
     if possible_exam_cols:
@@ -380,7 +380,7 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
             temp = temp | to_bool(df[c])
         df["exame_ok"] = temp
 
-    # C7 - mulher / prevenção do câncer (operacional local)
+    # C7 - mulher / prevenção do câncer
     df["citopatologico_ok"] = False
     df["mamografia_ok"] = False
     if "citopatologico" in df.columns:
@@ -397,6 +397,7 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
 # =========================
 # Cálculos
 # =========================
+
 def calculate_score_indicator(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
     df = df.copy()
     weights = spec.weights or {}
@@ -451,28 +452,77 @@ def build_good_practices_df(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFra
         realizados = int((aplicavel & to_bool(df[col])).sum())
         nao_realizados = max(total_aplicavel - realizados, 0)
         perc = round((realizados / total_aplicavel) * 100, 1) if total_aplicavel else 0.0
-        rows.append(
-            {
-                "Boa prática": label_boa_pratica(spec.code, col),
-                "Peso": peso,
-                "Realizados": realizados,
-                "% Realizado": perc,
-                "Não realizado": nao_realizados,
-            }
-        )
+        rows.append({
+            "Boa prática": label_boa_pratica(spec.code, col),
+            "coluna": col,
+            "Peso": peso,
+            "Realizados": realizados,
+            "% Realizado": perc,
+            "Não realizado": nao_realizados,
+        })
     return pd.DataFrame(rows)
+
+
+# =========================
+# Filtros globais
+# =========================
+
+def apply_global_filters(df: pd.DataFrame, spec: IndicatorSpec) -> Tuple[pd.DataFrame, Optional[str]]:
+    with st.sidebar:
+        st.header("Filtros do painel")
+        equipes = sorted([str(e) for e in df.get("equipe", pd.Series(dtype=str)).dropna().unique() if str(e).strip()])
+        microareas = sorted([str(m) for m in df.get("micro_area", pd.Series(dtype=str)).dropna().unique() if str(m).strip()])
+        faixas = sorted([str(f) for f in df.get("faixa_etaria", pd.Series(dtype=str)).dropna().unique() if str(f).strip()])
+
+        eq_sel = st.multiselect("Por equipe", equipes)
+        ma_sel = st.multiselect("Por microárea", microareas)
+        fx_sel = st.multiselect("Por faixa etária", faixas)
+
+        # Pendências com rótulos amigáveis
+        bp_df_full = build_good_practices_df(df, spec)
+        pend_options = ["Todos"]
+        label_to_col: Dict[str, str] = {}
+        for _, row in bp_df_full.iterrows():
+            label = row["Boa prática"]
+            col = row["coluna"]
+            pend_options.append(label)
+            label_to_col[label] = col
+        if "pendencias" in df.columns:
+            pend_options.insert(1, "Sem pendências")
+
+        pend_sel = st.selectbox("Por pendências", pend_options)
+
+    out = df.copy()
+    if eq_sel:
+        out = out[out["equipe"].astype(str).isin(eq_sel)]
+    if ma_sel:
+        out = out[out["micro_area"].astype(str).isin(ma_sel)]
+    if fx_sel:
+        out = out[out["faixa_etaria"].astype(str).isin(fx_sel)]
+
+    if pend_sel == "Sem pendências" and "pendencias" in out.columns:
+        out = out[out["pendencias"] == 0]
+    elif pend_sel != "Todos" and pend_sel in label_to_col:
+        col = label_to_col[pend_sel]
+        if col in out.columns:
+            out = out[~to_bool(out[col])]  # pacientes com a boa prática não realizada
+
+    selected_label = pend_sel if pend_sel != "Todos" else None
+    return out, selected_label
 
 
 # =========================
 # Renderização
 # =========================
+
 def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
     bp_df = build_good_practices_df(df, spec)
     st.markdown("### Cumprimento das boas práticas")
     if bp_df.empty:
         st.info("Não foi possível identificar boas práticas estruturadas para este relatório.")
         return
-    st.dataframe(bp_df, use_container_width=True)
+
+    st.dataframe(bp_df[["Boa prática", "Peso", "Realizados", "% Realizado", "Não realizado"]], use_container_width=True)
     fig = px.bar(
         bp_df,
         x="Boa prática",
@@ -497,17 +547,12 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
 
     total = len(df_scored)
     media_score = df_scored["score"].mean() if total > 0 else 0
-    otimos = int((df_scored["classificacao"] == "Ótimo").sum())
-    bons = int((df_scored["classificacao"] == "Bom").sum())
-    suficientes = int((df_scored["classificacao"] == "Suficiente").sum())
-    regulares = int((df_scored["classificacao"] == "Regular").sum())
+    desempenho = classificar_score(media_score)
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total", total)
-    c2.metric("Score médio", f"{media_score:.1f}")
-    c3.metric("Ótimo", otimos)
-    c4.metric("Bom", bons)
-    c5.metric("Pendência alta", regulares + suficientes)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total de Pacientes", total)
+    c2.metric("Score", f"{media_score:.1f}")
+    c3.metric("Desempenho", desempenho)
 
     colg1, colg2 = st.columns(2)
     with colg1:
@@ -540,11 +585,12 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     total = len(df_calc)
     cobertos = int(pd.to_numeric(df_calc["numerador"], errors="coerce").fillna(0).sum())
     elegiveis = int(pd.to_numeric(df_calc["denominador"], errors="coerce").fillna(0).sum())
+    desempenho = classificar_score(indicador)
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Total de registros", total)
-    c2.metric("Numerador", cobertos)
-    c3.metric("Indicador", f"{indicador:.1f}%")
+    c1.metric("Total de Pacientes", total)
+    c2.metric("Score", f"{indicador:.1f}")
+    c3.metric("Desempenho", desempenho)
 
     if "equipe" in df_calc.columns:
         by_team = (
@@ -562,21 +608,6 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
 
 def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     st.markdown("### Lista nominal")
-    equipes = sorted([str(e) for e in df.get("equipe", pd.Series(dtype=str)).dropna().unique() if str(e).strip()])
-    microareas = sorted([str(m) for m in df.get("micro_area", pd.Series(dtype=str)).dropna().unique() if str(m).strip()])
-
-    f1, f2, f3 = st.columns(3)
-    equipe_sel = f1.selectbox("Equipe", ["(todas)"] + equipes, key=f"eq_{spec.code}")
-    micro_sel = f2.selectbox("Microárea", ["(todas)"] + microareas, key=f"ma_{spec.code}")
-    classe_sel = f3.selectbox("Classificação", ["(todas)", "Ótimo", "Bom", "Suficiente", "Regular"], key=f"cl_{spec.code}")
-
-    view = df.copy()
-    if equipe_sel != "(todas)":
-        view = view[view["equipe"].astype(str) == equipe_sel]
-    if micro_sel != "(todas)":
-        view = view[view["micro_area"].astype(str) == micro_sel]
-    if classe_sel != "(todas)" and "classificacao" in view.columns:
-        view = view[view["classificacao"] == classe_sel]
 
     preferred_cols = [
         "nome", "cpf", "cns", "idade", "faixa_etaria", "endereco",
@@ -586,22 +617,23 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         "antropometria_ok", "visita_ok", "visitas_ok", "hba1c_ok",
         "pes_ok", "influenza_ok", "citopatologico_ok", "mamografia_ok", "exame_ok",
     ]
-    cols = [c for c in preferred_cols if c in view.columns]
+    cols = [c for c in preferred_cols if c in df.columns]
     if not cols:
-        cols = list(view.columns)
+        cols = list(df.columns)
 
-    st.dataframe(view[cols], use_container_width=True, height=420)
+    st.dataframe(df[cols], use_container_width=True, height=420)
 
-    csv_bytes = view[cols].to_csv(index=False).encode("utf-8-sig")
+    csv_bytes = df[cols].to_csv(index=False).encode("utf-8-sig")
     st.download_button(
         "Baixar CSV filtrado",
         data=csv_bytes,
         file_name=f"{spec.code.lower()}_lista_filtrada.csv",
         mime="text/csv",
     )
+
     st.download_button(
         "Baixar Excel filtrado",
-        data=export_excel_bytes(view[cols]),
+        data=export_excel_bytes(df[cols]),
         file_name=f"{spec.code.lower()}_lista_filtrada.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
@@ -610,6 +642,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
 # =========================
 # Aplicação
 # =========================
+
 def main():
     st.title("Saúde 360 APS - Dashboard multipainel")
     st.caption("Painel expandido para os 7 indicadores com leitura flexível de relatórios e cálculo operacional local.")
@@ -642,7 +675,12 @@ def main():
     spec = INDICATORS[selected_code]
     df = preprocess_df(df_raw, selected_code)
 
+    # Filtros globais que impactam todo o painel
+    df_filtered, pend_label = apply_global_filters(df, spec)
+
     st.success(f"Indicador em análise: {spec.code} - {spec.name}")
+    if pend_label:
+        st.caption(f"Filtro de pendências aplicado: {pend_label}")
 
     tab1, tab2, tab3 = st.tabs(["Painel", "Qualidade dos dados", "Prévia do arquivo"])
 
@@ -650,9 +688,9 @@ def main():
         st.markdown(f"## {spec.code} - {spec.name}")
         st.write(spec.description)
         if spec.type == "score":
-            render_score_dashboard(df, spec)
+            render_score_dashboard(df_filtered, spec)
         else:
-            render_percentual_dashboard(df, spec)
+            render_percentual_dashboard(df_filtered, spec)
 
     with tab2:
         st.markdown("## Qualidade dos dados")
