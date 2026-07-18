@@ -241,6 +241,22 @@ def indicator_summary(df: pd.DataFrame, spec: IndicatorSpec) -> Dict[str, float]
     return {"entidades": len(df), "score_medio": round(df["score"].mean(), 1) if len(df) else 0.0, "score_max": round(df["score"].max(), 1) if len(df) else 0.0, "com_pendencias": int((df["pendencias"] > 0).sum()) if len(df) else 0}
 
 
+def microarea_summary(df: pd.DataFrame, spec: IndicatorSpec) -> str:
+    if "micro_area" not in df.columns:
+        return "Sem microárea"
+    base = df[df["micro_area"].astype(str).str.strip() != ""].copy()
+    if base.empty:
+        return "Sem microárea"
+    if spec.type == "percentual":
+        agg = base.assign(_num=to_bool(base[spec.numerator_col]), _den=to_bool(base[spec.denominator_col])).groupby("micro_area", dropna=False).agg(numerador=("_num", "sum"), denominador=("_den", "sum")).reset_index()
+        agg["valor"] = np.where(agg["denominador"] > 0, (agg["numerador"] / agg["denominador"]) * 100, 0)
+    else:
+        agg = base.groupby("micro_area", dropna=False).agg(valor=("score", "mean")).reset_index()
+    if agg.empty:
+        return "Sem microárea"
+    best = agg.sort_values("valor", ascending=False).iloc[0]
+    return f"{best['micro_area']}: {round(float(best['valor']), 1)}"
+
 def render_summary(df: pd.DataFrame, spec: IndicatorSpec):
     summary = indicator_summary(df, spec)
     st.markdown(f"## {spec.code} — {spec.name}")
@@ -261,55 +277,22 @@ def render_summary(df: pd.DataFrame, spec: IndicatorSpec):
     if spec.type == "percentual":
         cards = [
             ("Total de Pacientes", summary["entidades"], spec.entity_label),
-            ("Score", f'{summary["resultado"]}%', "resultado do indicador"),
-            ("Acompanhados", summary["numerador"], "registros no numerador"),
+            ("Desempenho geral", f'{summary["resultado"]}%', "resultado do indicador"),
+            ("Melhor microárea", microarea_summary(df, spec), "desempenho por microárea"),
             ("Com pendências", max(summary["denominador"] - summary["numerador"], 0), "fora do numerador"),
         ]
     else:
         cards = [
             ("Total de Pacientes", summary["entidades"], spec.entity_label),
-            ("Score", summary["score_medio"], "score médio"),
-            ("Acompanhados", int((df["pendencias"] == 0).sum()) if len(df) else 0, "sem pendências"),
+            ("Desempenho geral", summary["score_medio"], "score médio"),
+            ("Melhor microárea", microarea_summary(df, spec), "desempenho por microárea"),
             ("Com pendências", summary["com_pendencias"], "com pelo menos uma pendência"),
         ]
-    html = '<div class="metric-card-wrap">' + ''.join([f'<div class="metric-card"><div class="metric-label">{label}</div><div class="metric-value">{value}</div><div class="metric-help">{help_text}</div></div>' for label, value, help_text in cards]) + '</div>'
-    st.markdown(html, unsafe_allow_html=True)
-
-
-def render_charts(df: pd.DataFrame, spec: IndicatorSpec):
-    if spec.type == "percentual":
-        team = df.assign(_num=to_bool(df[spec.numerator_col]), _den=to_bool(df[spec.denominator_col])).groupby("equipe", dropna=False).agg(numerador=("_num", "sum"), denominador=("_den", "sum")).reset_index()
-        team["resultado"] = np.where(team["denominador"] > 0, (team["numerador"] / team["denominador"]) * 100, 0)
-        fig = px.bar(team.sort_values("resultado", ascending=False), x="equipe", y="resultado", color="resultado", color_continuous_scale="Tealgrn", title="Resultado por equipe")
-        st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(team, use_container_width=True)
-        return
-
-    c1, c2 = st.columns(2)
-    team = df.groupby("equipe", dropna=False).agg(score_medio=("score", "mean"), total=("nome", "count")).reset_index()
-    unit = df.groupby("unidade", dropna=False).agg(score_medio=("score", "mean"), total=("nome", "count")).reset_index()
-    fig_team = px.bar(team.sort_values("score_medio", ascending=False), x="equipe", y="score_medio", color="score_medio", color_continuous_scale="Tealgrn", title="Score médio por equipe")
-    fig_unit = px.bar(unit.sort_values("score_medio", ascending=False), x="unidade", y="score_medio", color="score_medio", color_continuous_scale="Tealgrn", title="Score médio por unidade")
-    c1.plotly_chart(fig_team, use_container_width=True)
-    c2.plotly_chart(fig_unit, use_container_width=True)
-
-    c3, c4 = st.columns(2)
-    cls = df["classificacao"].value_counts().rename_axis("classificacao").reset_index(name="total")
-    fig_cls = px.pie(cls, names="classificacao", values="total", title="Classificação geral", color="classificacao", color_discrete_map={"Ótimo": "#1f7a4d", "Bom": "#2e8b8b", "Suficiente": "#d19900", "Regular": "#a13544"})
-    pend = df[[c for c in (spec.weights or {}).keys() if c in df.columns]].copy()
-    c3.plotly_chart(fig_cls, use_container_width=True)
-    if not pend.empty:
-        pend = pend.apply(to_bool)
-        cumprimento = pd.DataFrame({
-            "boa_pratica": pend.columns,
-            "realizaram": pend.sum().values,
-            "nao_realizaram": (~pend).sum().values,
-        }).sort_values("nao_realizaram", ascending=False)
-        fig_pend = px.bar(cumprimento, x="boa_pratica", y=["realizaram", "nao_realizaram"], barmode="group", title="Cumprimento por boa prática")
-        c4.plotly_chart(fig_pend, use_container_width=True)
-        st.subheader("Cumprimento por boa prática")
-        st.dataframe(cumprimento, use_container_width=True)
-
+    html = ''.join([
+        f'<div class="metric-card"><div class="metric-label">{label}</div><div class="metric-value">{value}</div><div class="metric-help">{help_text}</div></div>'
+        for label, value, help_text in cards
+    ])
+    st.markdown(f'<div class="metric-card-wrap">{html}</div>', unsafe_allow_html=True)
 
 def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     with st.sidebar:
@@ -383,18 +366,22 @@ def main():
         render_charts(df, spec)
 
     with tab2:
-        nominal_cols = [c for c in ["nome", "data_nascimento", "idade", "endereco", "sexo", "unidade", "equipe", "micro_area", "score", "pendencias", "classificacao"] if c in df.columns]
+        nominal_cols = [c for c in ["nome", "data_nascimento", "idade", "endereco", "sexo", "micro_area", "unidade", "equipe", "cns", "cpf", "score", "pendencias", "classificacao"] if c in df.columns]
         if spec.type == "percentual":
-            nominal_cols = [c for c in ["nome", "data_nascimento", "idade", "endereco", "sexo", "unidade", "equipe", spec.numerator_col, spec.denominator_col] if c in df.columns]
-        st.dataframe(df[nominal_cols], use_container_width=True, height=520)
+            nominal_cols = [c for c in ["nome", "data_nascimento", "idade", "endereco", "sexo", "micro_area", "unidade", "equipe", "cns", "cpf", spec.numerator_col, spec.denominator_col] if c in df.columns]
+        remaining = [c for c in df.columns if c not in nominal_cols]
+        st.dataframe(df[nominal_cols + remaining], use_container_width=True, height=520)
         export_results(df)
 
     with tab3:
-        if spec.type == "percentual":
-            team = df.assign(_num=to_bool(df[spec.numerator_col]), _den=to_bool(df[spec.denominator_col])).groupby(["unidade", "equipe"], dropna=False).agg(numerador=("_num", "sum"), denominador=("_den", "sum")).reset_index()
-            team["resultado"] = np.where(team["denominador"] > 0, (team["numerador"] / team["denominador"]) * 100, 0)
+        if "micro_area" in df.columns:
+            if spec.type == "percentual":
+                team = df.assign(_num=to_bool(df[spec.numerator_col]), _den=to_bool(df[spec.denominator_col])).groupby(["micro_area"], dropna=False).agg(numerador=("_num", "sum"), denominador=("_den", "sum")).reset_index()
+                team["resultado"] = np.where(team["denominador"] > 0, (team["numerador"] / team["denominador"]) * 100, 0)
+            else:
+                team = df.groupby(["micro_area"], dropna=False).agg(total=("nome", "count"), score_medio=("score", "mean"), com_pendencias=("pendencias", lambda s: int((s > 0).sum()))).reset_index()
         else:
-            team = df.groupby(["unidade", "equipe"], dropna=False).agg(total=("nome", "count"), score_medio=("score", "mean"), com_pendencias=("pendencias", lambda s: int((s > 0).sum()))).reset_index()
+            team = pd.DataFrame()
         st.dataframe(team, use_container_width=True, height=520)
 
     with tab4:
