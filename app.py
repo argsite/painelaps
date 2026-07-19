@@ -658,10 +658,19 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     c3.metric("Desempenho", desempenho)
 
     colg1, colg2 = st.columns(2)
-    with colg1:
-        if total > 0:
-            fig_score = px.histogram(df_scored, x="score", nbins=10, title="Distribuição dos pontos por paciente (0–100)")
-            st.plotly_chart(fig_score, use_container_width=True)
+with colg1:
+    if total > 0:
+        bp_df = build_good_practices_df(df_scored, spec)
+        if not bp_df.empty:
+            fig_bp = px.bar(
+                bp_df,
+                x="Boa prática",
+                y="% Realizado",
+                text="% Realizado",
+                title="Percentual de realização por boa prática",
+            )
+            fig_bp.update_layout(xaxis_title="", yaxis_title="%")
+            st.plotly_chart(fig_bp, use_container_width=True)
     with colg2:
         class_df = df_scored["classificacao"].value_counts().reset_index()
         class_df.columns = ["Classificação", "Quantidade"]
