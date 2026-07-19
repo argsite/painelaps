@@ -557,12 +557,12 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     colg1, colg2 = st.columns(2)
     with colg1:
         if total > 0:
-            fig_score = px.histogram(df_scored, x="score", nbins=10, title="Distribuição de score")
+            fig_score = px.histogram(df_scored, x="score", nbins=10, title="Distribuição dos pontos por paciente (0–100)")
             st.plotly_chart(fig_score, use_container_width=True)
     with colg2:
         class_df = df_scored["classificacao"].value_counts().reset_index()
         class_df.columns = ["Classificação", "Quantidade"]
-        fig_class = px.pie(class_df, names="Classificação", values="Quantidade", title="Classificação")
+        fig_class = px.pie(class_df, names="Classificação", values="Quantidade", title="Distribuição dos pacientes por faixa de desempenho")
         st.plotly_chart(fig_class, use_container_width=True)
 
     render_good_practices(df_scored, spec)
