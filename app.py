@@ -746,32 +746,27 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
 
     colg1, colg2 = st.columns(2)
 
-    # Coluna esquerda: gráfico por boas práticas A–E
+    # Coluna esquerda: gráfico por boas práticas (A–E)
     with colg1:
         if total > 0:
             bp_df = build_good_practices_df(df_scored, spec)
             if not bp_df.empty:
-                            # Criar coluna só com a letra da boa prática (A, B, C, D, E)
-            bp_df = bp_df.copy()
-            bp_df["Letra"] = bp_df["Boa prática"].str.extract(r"^([A-Z])", expand=False).fillna("")
+                bp_df = bp_df.copy()
+                # extrai a letra inicial (A, B, C, D, E)
+                bp_df["Letra"] = (
+                    bp_df["Boa prática"]
+                    .str.extract(r"^([A-Z])", expand=False)
+                    .fillna("")
+                )
 
-            fig_bp = px.bar(
-                bp_df,
-                x="Letra",           # apenas A, B, C, D, E
-                y="% Realizado",
-                text="% Realizado",
-                title="Percentual de realização por boa prática (A–E)",
-            )
-            fig_bp.update_layout(xaxis_title="Boa prática", yaxis_title="%")
-            st.plotly_chart(fig_bp, use_container_width=True)
                 fig_bp = px.bar(
                     bp_df,
-                    x="Boa prática",
+                    x="Letra",          # apenas A, B, C, D, E
                     y="% Realizado",
                     text="% Realizado",
                     title="Percentual de realização por boa prática (A–E)",
                 )
-                fig_bp.update_layout(xaxis_title="", yaxis_title="%")
+                fig_bp.update_layout(xaxis_title="Boa prática", yaxis_title="%")
                 st.plotly_chart(fig_bp, use_container_width=True)
 
     # Coluna direita: pizza de classificação
@@ -786,6 +781,7 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
         )
         st.plotly_chart(fig_class, use_container_width=True)
 
+    # Abaixo, tabela e lista nominal (layout original)
     render_good_practices(df_scored, spec)
     render_nominal(df_scored, spec)
 
