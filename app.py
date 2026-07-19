@@ -189,34 +189,57 @@ INDICATORS: Dict[str, IndicatorSpec] = {
         code="C2",
         name="Cuidado no desenvolvimento infantil",
         type="score",
-        description="Painel operacional local para acompanhamento do desenvolvimento infantil.",
-        weights={"consulta_ok": 30, "vacina_ok": 25, "antropometria_ok": 25, "visita_ok": 20},
+        description="Monitoramento da puericultura de crianças até 2 anos com base nas práticas A–E.",
+        weights={
+            "c2_a_ok": 20,  # 1ª consulta até 30º dia
+            "c2_b_ok": 20,  # 9 consultas até 2 anos
+            "c2_c_ok": 20,  # 9 registros de peso/altura
+            "c2_d_ok": 20,  # visita domiciliar em tempo oportuno
+            "c2_e_ok": 20,  # esquema vacinal em dia
+        },
         entity_label="crianças acompanhadas",
     ),
     "C3": IndicatorSpec(
         code="C3",
         name="Cuidado na gestação e puerpério",
         type="score",
-        description="Painel operacional local para gestantes e puérperas.",
-        weights={"consulta_ok": 30, "pa_ok": 20, "antropometria_ok": 15, "visita_ok": 15, "exame_ok": 20},
+        description="Painel operacional local para gestantes e puérperas com base nas práticas A–D.",
+        weights={
+            "c3_a_ok": 25,  # 1ª consulta até 12ª semana
+            "c3_b_ok": 25,  # mínimo de 6 consultas de pré-natal
+            "c3_c_ok": 25,  # exames laboratoriais obrigatórios realizados/avaliados
+            "c3_d_ok": 25,  # consulta de puerpério até 42º dia
+        },
         entity_label="gestantes/puérperas",
     ),
     "C4": IndicatorSpec(
         code="C4",
         name="Cuidado da pessoa com diabetes",
         type="score",
-        description="Pontuação por pessoa com diabetes até 100 pontos.",
-        weights={"consulta_ok": 20, "hba1c_ok": 15, "pes_ok": 15, "visita_ok": 20, "pa_ok": 15, "antropometria_ok": 15},
-        non_conditionals={"visita_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index)},
+        description="Pontuação por pessoa com diabetes até 100 pontos a partir das práticas A–D.",
+        weights={
+            "c4_a_ok": 25,  # consulta em 6 meses
+            "c4_b_ok": 25,  # PA em 6 meses
+            "c4_c_ok": 25,  # antropometria em 6 meses
+            "c4_d_ok": 25,  # 2 visitas domiciliares em 12 meses (motivo diabetes)
+        },
+        non_conditionals={
+            # visitas domiciliares só contam como boa prática para tipo 76 (ACS/TACS), se aplicável
+            "c4_d_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index),
+        },
         entity_label="pessoas com diabetes",
     ),
     "C5": IndicatorSpec(
         code="C5",
         name="Cuidado da pessoa com hipertensão",
         type="score",
-        description="Pontuação por pessoa com hipertensão até 100 pontos.",
-        weights={"consulta_ok": 25, "pa_ok": 25, "antropometria_ok": 25, "visita_ok": 25},
-        non_conditionals={"visita_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index)},
+        description="Pontuação por pessoa com hipertensão até 100 pontos a partir das práticas A–D.",
+        weights={
+            "c5_a_ok": 25,  # consulta em 6 meses
+            "c5_b_ok": 25,  # PA em 6 meses
+            "c5_c_ok": 25,  # 2 visitas domiciliares em 12 meses
+            "c5_d_ok": 25,  # avaliação/atendimento em saúde bucal no quadrimestre
+        },
         entity_label="pessoas com hipertensão",
     ),
     "C6": IndicatorSpec(
@@ -224,16 +247,28 @@ INDICATORS: Dict[str, IndicatorSpec] = {
         name="Cuidado da pessoa idosa",
         type="score",
         description="Pontuação por pessoa idosa até 100 pontos.",
-        weights={"consulta_ok": 25, "antropometria_ok": 25, "visitas_ok": 25, "influenza_ok": 25},
-        non_conditionals={"visitas_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index)},
+        weights={
+            "consulta_ok": 25,
+            "antropometria_ok": 25,
+            "visitas_ok": 25,
+            "influenza_ok": 25,
+        },
+        non_conditionals={
+            "visitas_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index),
+        },
         entity_label="pessoas idosas",
     ),
     "C7": IndicatorSpec(
         code="C7",
         name="Cuidado da mulher na prevenção do câncer",
         type="score",
-        description="Painel operacional local para prevenção do câncer da mulher.",
-        weights={"citopatologico_ok": 35, "mamografia_ok": 25, "consulta_ok": 20, "visita_ok": 20},
+        description="Painel operacional local para prevenção do câncer da mulher com base nas práticas A–D.",
+        weights={
+            "c7_a_ok": 25,  # citopatológico/HPV em prazos corretos
+            "c7_b_ok": 25,  # vacina HPV 9–14 anos
+            "c7_c_ok": 25,  # atendimento em saúde sexual e reprodutiva
+            "c7_d_ok": 25,  # mamografia 50–69 anos em 24 meses
+        },
         entity_label="mulheres acompanhadas",
     ),
 }
@@ -388,8 +423,78 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
     elif "acompanhado" in df.columns and indicator_code == "C7":
         df["citopatologico_ok"] = to_bool(df["acompanhado"])
 
-    if "mamografia" in df.columns:
-        df["mamografia_ok"] = to_bool(df["mamografia"])
+    # Flags específicas A–E por indicador (operacional local)
+    # C2 - Desenvolvimento infantil (relatório infantil)
+    if indicator_code == "C2":
+        # Exemplo: colunas de contagem/flags no relatório infantil.
+        # Ajuste os nomes conforme seu arquivo real.
+        if "qtd_consultas" in df.columns:
+            df["c2_b_ok"] = parse_count(df["qtd_consultas"]).fillna(0).ge(9)
+        if "qtd_registros_de_peso_altura" in df.columns:
+            df["c2_c_ok"] = parse_count(df["qtd_registros_de_peso_altura"]).fillna(0).ge(9)
+        if "visita_oportuna" in df.columns:
+            df["c2_d_ok"] = to_bool(df["visita_oportuna"])
+        if "vacina_em_dia" in df.columns:
+            df["c2_e_ok"] = to_bool(df["vacina_em_dia"])
+        # A - 1ª consulta até 30º dia
+        if "consulta_ate_30_dias" in df.columns:
+            df["c2_a_ok"] = to_bool(df["consulta_ate_30_dias"])
+
+    # C3 - Gestante e puérpera
+    if indicator_code == "C3":
+        if "consulta_inicial_ate_12s" in df.columns:
+            df["c3_a_ok"] = to_bool(df["consulta_inicial_ate_12s"])
+        if "qtd_consultas_prenatal" in df.columns:
+            df["c3_b_ok"] = parse_count(df["qtd_consultas_prenatal"]).fillna(0).ge(6)
+        if "exames_obrigatorios_ok" in df.columns:
+            df["c3_c_ok"] = to_bool(df["exames_obrigatorios_ok"])
+        if "consulta_puerperio_ate_42d" in df.columns:
+            df["c3_d_ok"] = to_bool(df["consulta_puerperio_ate_42d"])
+
+    # C4 - Diabetes
+    if indicator_code == "C4":
+        # A - consulta em 6 meses
+        df["c4_a_ok"] = to_bool(df["consulta_medica_enfermagem"]) if "consulta_medica_enfermagem" in df.columns else df.get("consulta_ok", False)
+        # B - PA em 6 meses
+        df["c4_b_ok"] = to_bool(df["afericao_de_pa"]) if "afericao_de_pa" in df.columns else df.get("pa_ok", False)
+        # C - antropometria em 6 meses
+        if "qtd_registros_de_peso_altura" in df.columns:
+            df["c4_c_ok"] = parse_count(df["qtd_registros_de_peso_altura"]).fillna(0).ge(1)
+        else:
+            df["c4_c_ok"] = df.get("antropometria_ok", False)
+        # D - 2 visitas domiciliares em 12 meses (motivo diabetes)
+        if "qtd_visitas_domiciliares" in df.columns:
+            df["c4_d_ok"] = parse_count(df["qtd_visitas_domiciliares"]).fillna(0).ge(2)
+        else:
+            df["c4_d_ok"] = df.get("visita_ok", False)
+
+    # C5 - Hipertensão
+    if indicator_code == "C5":
+        # A - consulta em 6 meses
+        df["c5_a_ok"] = to_bool(df["consulta_medica_enfermagem"]) if "consulta_medica_enfermagem" in df.columns else df.get("consulta_ok", False)
+        # B - PA em 6 meses
+        df["c5_b_ok"] = to_bool(df["afericao_de_pressao_arterial"]) if "afericao_de_pressao_arterial" in df.columns else df.get("pa_ok", False)
+        # C - 2 visitas domiciliares em 12 meses
+        if "qtd_visitas_domiciliares" in df.columns:
+            df["c5_c_ok"] = parse_count(df["qtd_visitas_domiciliares"]).fillna(0).ge(2)
+        else:
+            df["c5_c_ok"] = df.get("visita_ok", False)
+        # D - saúde bucal no quadrimestre (ajuste conforme coluna real)
+        if "saude_bucal_ok" in df.columns:
+            df["c5_d_ok"] = to_bool(df["saude_bucal_ok"])
+
+    # C7 - Mulher / prevenção do câncer
+    if indicator_code == "C7":
+        if "citopatologico_ou_hpv_ok" in df.columns:
+            df["c7_a_ok"] = to_bool(df["citopatologico_ou_hpv_ok"])
+        else:
+            df["c7_a_ok"] = df.get("citopatologico_ok", False)
+        if "vacina_hpv_ok" in df.columns:
+            df["c7_b_ok"] = to_bool(df["vacina_hpv_ok"])
+        if "saude_sexual_reprodutiva_ok" in df.columns:
+            df["c7_c_ok"] = to_bool(df["saude_sexual_reprodutiva_ok"])
+        if "mamografia_ok" in df.columns:
+            df["c7_d_ok"] = to_bool(df["mamografia_ok"])
 
     return df
 
