@@ -753,10 +753,10 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     render_nominal(df_calc, spec)
 
 
-    def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
-        st.markdown("### Lista nominal")
+def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
+    st.markdown("### Lista nominal")
 
-        preferred_cols = [
+    preferred_cols = [
         "nome",
         "cpf",
         "cns",
@@ -783,14 +783,14 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
         "citopatologico_ok",
         "mamografia_ok",
         "exame_ok",
-        ]
+    ]
 
-        cols = [c for c in preferred_cols if c in df.columns]
-        if not cols:
+    cols = [c for c in preferred_cols if c in df.columns]
+    if not cols:
         cols = list(df.columns)
 
-        bp_df = build_good_practices_df(df, spec)
-        if bp_df.empty:
+    bp_df = build_good_practices_df(df, spec)
+    if bp_df.empty:
         st.dataframe(df[cols], use_container_width=True, height=420)
         csv_bytes = df[cols].to_csv(index=False).encode("utf-8-sig")
         st.download_button(
@@ -821,6 +821,47 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     tabs = st.tabs(tab_labels)
 
     with tabs[0]:
+        st.dataframe(df[cols], use_container_width=True, height=420)
+        csv_bytes = df[cols].to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            "Baixar CSV filtrado",
+            data=csv_bytes,
+            file_name=f"{spec.code.lower()}_lista_filtrada.csv",
+            mime="text/csv",
+            key=f"{spec.code}_csv_all",
+        )
+        st.download_button(
+            "Baixar Excel filtrado",
+            data=export_excel_bytes(df[cols]),
+            file_name=f"{spec.code.lower()}_lista_filtrada.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"{spec.code}_xlsx_all",
+        )
+
+    for i, letra in enumerate(letters, start=1):
+        col_bp = label_to_col.get(letra)
+        if col_bp not in df.columns:
+            filtered = df.iloc[0:0].copy()
+        else:
+            filtered = df[~to_bool(df[col_bp])].copy()
+
+        with tabs[i]:
+            st.dataframe(filtered[cols], use_container_width=True, height=420)
+            csv_bytes = filtered[cols].to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                "Baixar CSV filtrado",
+                data=csv_bytes,
+                file_name=f"{spec.code.lower()}_pendencia_{letra}.csv",
+                mime="text/csv",
+                key=f"{spec.code}_csv_{letra}",
+            )
+            st.download_button(
+                "Baixar Excel filtrado",
+                data=export_excel_bytes(filtered[cols]),
+                file_name=f"{spec.code.lower()}_pendencia_{letra}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"{spec.code}_xlsx_{letra}",
+            )
         
 # =========================
 # Aplicação
