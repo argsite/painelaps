@@ -371,7 +371,7 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
     else:
         df["consulta_ok"] = False
 
-     if "afericao_de_pressao_arterial" in df.columns:
+    if "afericao_de_pressao_arterial" in df.columns:
         df["c5_b_ok"] = to_bool(df["afericao_de_pressao_arterial"])
     elif "afericao_de_pa" in df.columns:
         df["c5_b_ok"] = to_bool(df["afericao_de_pa"])
