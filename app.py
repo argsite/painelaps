@@ -812,9 +812,9 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
 
 
 def main():
-    st.title("Saúde 360 APS - Dashboard multipainel")
+    st.title("APS 360 - Painel de Indicadores")
     st.caption(
-        "Painel expandido para os 7 indicadores com leitura flexível de relatórios e cálculo operacional local."
+        "Ferramenta de apoio às equipes e à gestão no monitoramento dos indicadores e do cuidado na APS.."
     )
 
     st.sidebar.header("Importação")
@@ -830,8 +830,7 @@ def main():
 
     if uploaded_file is None:
         st.info(
-            "Envie um relatório para começar. O app tenta identificar o indicador automaticamente "
-            "pelo nome do arquivo e pelas colunas."
+            "Envie um relatório para começar."
         )
         st.stop()
 
