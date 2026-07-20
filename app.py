@@ -755,6 +755,7 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
 
 def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     st.markdown("### Lista nominal")
+    st.caption(f"Total de pacientes exibidos: {len(df)}")
 
     preferred_cols = [
         "nome",
