@@ -753,7 +753,7 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     render_nominal(df_calc, spec)
 
 
-def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
+    def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     st.markdown("### Lista nominal")
 
     preferred_cols = [
