@@ -789,23 +789,39 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     if not cols:
         cols = list(df.columns)
 
-    st.dataframe(df[cols], use_container_width=True, height=420)
+    bp_df = build_good_practices_df(df, spec)
+    if bp_df.empty:
+        st.dataframe(df[cols], use_container_width=True, height=420)
+        csv_bytes = df[cols].to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            "Baixar CSV filtrado",
+            data=csv_bytes,
+            file_name=f"{spec.code.lower()}_lista_filtrada.csv",
+            mime="text/csv",
+        )
+        st.download_button(
+            "Baixar Excel filtrado",
+            data=export_excel_bytes(df[cols]),
+            file_name=f"{spec.code.lower()}_lista_filtrada.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        return
 
-    csv_bytes = df[cols].to_csv(index=False).encode("utf-8-sig")
-    st.download_button(
-        "Baixar CSV filtrado",
-        data=csv_bytes,
-        file_name=f"{spec.code.lower()}_lista_filtrada.csv",
-        mime="text/csv",
-    )
+    label_to_col = {}
+    letters = []
+    for _, row in bp_df.iterrows():
+        label = str(row["Boa prática"])
+        col = str(row["coluna"])
+        letra = label[:1].upper()
+        label_to_col[letra] = col
+        if letra and letra not in letters:
+            letters.append(letra)
 
-    st.download_button(
-        "Baixar Excel filtrado",
-        data=export_excel_bytes(df[cols]),
-        file_name=f"{spec.code.lower()}_lista_filtrada.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    tab_labels = ["Lista nominal"] + [f"Pendência {l}" for l in letters]
+    tabs = st.tabs(tab_labels)
 
+    with tabs[0]:
+        
 # =========================
 # Aplicação
 # =========================
