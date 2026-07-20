@@ -10,7 +10,7 @@ import plotly.express as px
 import streamlit as st
 
 st.set_page_config(
-    page_title="Saúde 360 APS",
+    page_title="APS 360 - Painel de Indicadores",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
