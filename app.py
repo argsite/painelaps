@@ -754,9 +754,9 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
 
 
     def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
-    st.markdown("### Lista nominal")
+        st.markdown("### Lista nominal")
 
-    preferred_cols = [
+        preferred_cols = [
         "nome",
         "cpf",
         "cns",
@@ -783,14 +783,14 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
         "citopatologico_ok",
         "mamografia_ok",
         "exame_ok",
-    ]
+        ]
 
-    cols = [c for c in preferred_cols if c in df.columns]
-    if not cols:
+        cols = [c for c in preferred_cols if c in df.columns]
+        if not cols:
         cols = list(df.columns)
 
-    bp_df = build_good_practices_df(df, spec)
-    if bp_df.empty:
+        bp_df = build_good_practices_df(df, spec)
+        if bp_df.empty:
         st.dataframe(df[cols], use_container_width=True, height=420)
         csv_bytes = df[cols].to_csv(index=False).encode("utf-8-sig")
         st.download_button(
