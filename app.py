@@ -755,7 +755,6 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
 
 def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     st.markdown("### Lista nominal")
-    st.caption(f"Total de pacientes exibidos: {len(df)}")
 
     preferred_cols = [
         "nome",
@@ -823,6 +822,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
 
     with tabs[0]:
         st.dataframe(df[cols], use_container_width=True, height=420)
+        st.caption(f"Total de pacientes exibidos: {len(df)}")
         csv_bytes = df[cols].to_csv(index=False).encode("utf-8-sig")
         st.download_button(
             "Baixar CSV filtrado",
@@ -848,6 +848,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
 
         with tabs[i]:
             st.dataframe(filtered[cols], use_container_width=True, height=420)
+            st.caption(f"Total de pacientes exibidos: {len(filtered)}")
             csv_bytes = filtered[cols].to_csv(index=False).encode("utf-8-sig")
             st.download_button(
                 "Baixar CSV filtrado",
