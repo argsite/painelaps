@@ -756,7 +756,7 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
 def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     st.markdown("### Lista nominal")
 
-    preferred_cols = [
+    base_cols = [
         "nome",
         "cpf",
         "cns",
@@ -766,26 +766,25 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         "equipe",
         "micro_area",
         "equipe_vinculo",
-        "tipo_equipe",
         "score",
         "classificacao",
         "pendencias",
         "cadastro_ok",
-        "atendimento_ok",
-        "consulta_ok",
-        "pa_ok",
-        "antropometria_ok",
-        "visita_ok",
-        "visitas_ok",
-        "hba1c_ok",
-        "pes_ok",
-        "influenza_ok",
-        "citopatologico_ok",
-        "mamografia_ok",
-        "exame_ok",
     ]
 
-    cols = [c for c in preferred_cols if c in df.columns]
+    indicator_cols_map = {
+        "C1": ["numerador", "denominador"],
+        "C2": ["c2_a_ok", "c2_b_ok", "c2_c_ok", "c2_d_ok", "c2_e_ok"],
+        "C3": ["c3_a_ok", "c3_b_ok", "c3_c_ok", "c3_d_ok", "c3_e_ok", "c3_f_ok", "c3_g_ok", "c3_h_ok", "c3_i_ok", "c3_j_ok", "c3_k_ok"],
+        "C4": ["c4_a_ok", "c4_b_ok", "c4_c_ok", "c4_d_ok", "c4_e_ok", "c4_f_ok"],
+        "C5": ["c5_a_ok", "c5_b_ok", "c5_c_ok", "c5_d_ok"],
+        "C6": ["consulta_ok", "antropometria_ok", "visitas_ok", "influenza_ok"],
+        "C7": ["c7_a_ok", "c7_b_ok", "c7_c_ok", "c7_d_ok"],
+    }
+
+    cols = [c for c in base_cols if c in df.columns]
+    cols += [c for c in indicator_cols_map.get(spec.code, []) if c in df.columns]
+
     if not cols:
         cols = list(df.columns)
 
@@ -799,23 +798,46 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         "equipe": "Equipe",
         "micro_area": "Microárea",
         "equipe_vinculo": "Equipe vínculo",
-        "tipo_equipe": "Tipo equipe",
         "score": "Score",
         "classificacao": "Classificação",
         "pendencias": "Pendências",
         "cadastro_ok": "Cadastro OK",
-        "atendimento_ok": "Atendimento OK",
+        "numerador": "Numerador",
+        "denominador": "Denominador",
+        "c2_a_ok": "C2 - A",
+        "c2_b_ok": "C2 - B",
+        "c2_c_ok": "C2 - C",
+        "c2_d_ok": "C2 - D",
+        "c2_e_ok": "C2 - E",
+        "c3_a_ok": "C3 - A",
+        "c3_b_ok": "C3 - B",
+        "c3_c_ok": "C3 - C",
+        "c3_d_ok": "C3 - D",
+        "c3_e_ok": "C3 - E",
+        "c3_f_ok": "C3 - F",
+        "c3_g_ok": "C3 - G",
+        "c3_h_ok": "C3 - H",
+        "c3_i_ok": "C3 - I",
+        "c3_j_ok": "C3 - J",
+        "c3_k_ok": "C3 - K",
+        "c4_a_ok": "C4 - A",
+        "c4_b_ok": "C4 - B",
+        "c4_c_ok": "C4 - C",
+        "c4_d_ok": "C4 - D",
+        "c4_e_ok": "C4 - E",
+        "c4_f_ok": "C4 - F",
+        "c5_a_ok": "C5 - A",
+        "c5_b_ok": "C5 - B",
+        "c5_c_ok": "C5 - C",
+        "c5_d_ok": "C5 - D",
         "consulta_ok": "Consulta OK",
-        "pa_ok": "Aferição de PA",
         "antropometria_ok": "Antropometria OK",
-        "visita_ok": "Visita OK",
         "visitas_ok": "Visitas OK",
-        "hba1c_ok": "HBA1c OK",
-        "pes_ok": "Avaliação dos pés OK",
         "influenza_ok": "Influenza OK",
-        "citopatologico_ok": "Citopatológico OK",
-        "mamografia_ok": "Mamografia OK",
-        "exame_ok": "Exame OK",
+        "c7_a_ok": "C7 - A",
+        "c7_b_ok": "C7 - B",
+        "c7_c_ok": "C7 - C",
+        "c7_d_ok": "C7 - D",
     }
 
     df_display = df[cols].rename(
@@ -823,6 +845,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     )
 
     bp_df = build_good_practices_df(df, spec)
+
     if bp_df.empty:
         st.dataframe(df_display, use_container_width=True, height=420)
         st.caption(f"Total de pacientes exibidos: {len(df_display)}")
@@ -907,7 +930,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
                 file_name=f"{spec.code.lower()}_pendencia_{letra}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"{spec.code}_xlsx_{letra}",
-            )        
+            )   
 # =========================
 # Aplicação
 # =========================
