@@ -1172,8 +1172,8 @@ def main():
     df_filtered, _ = apply_global_filters(df, spec)
 
     #CHAMA TESTE
-        if selected_code == "C2":
-        debug_c2(df_filtered)
+if selected_code == "C2":
+debug_c2(df_filtered)
 
     team_display = None
     if "equipe" in df_filtered.columns:
