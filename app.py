@@ -1411,8 +1411,8 @@ def main():
     df = preprocess_df(df_raw, selected_code)
 
     df_filtered, _ = apply_global_filters(df, spec)
-    if indicator_code == "C2":
-        debug_c2_d(df_filtered)
+        if indicator_code == "C2":
+            debug_c2_d(df_filtered)
 
     team_display = None
     if "equipe" in df_filtered.columns:
