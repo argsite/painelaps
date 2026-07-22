@@ -1173,7 +1173,7 @@ def main():
 
     #CHAMA TESTE
 if selected_code == "C2":
-debug_c2(df_filtered)
+    debug_c2(df_filtered)
 
     team_display = None
     if "equipe" in df_filtered.columns:
