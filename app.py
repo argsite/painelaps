@@ -521,11 +521,25 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
         df["mamografia_ok"] = to_bool(df["mamografia"])
 
     # C2
+
+    # C2
     if indicator_code == "C2":
-        # A - 1ª consulta até 30 dias
-        # Planilha: "Consulta médica/enfermagem 1º mês" -> consulta_medica_enfermagem_1_mes
-        if "consulta_medica_enfermagem_1_mes" in df.columns:
-            df["c2_a_ok"] = to_bool(df["consulta_medica_enfermagem_1_mes"])
+        # Procurar coluna da consulta 1º mês por trecho no nome normalizado
+        # Em vez de assumir exatamente "consulta_medica_enfermagem_1_mes"
+        consulta_1m_col = None
+        for c in df.columns:
+            if (
+                "consulta" in c
+                and "medica" in c
+                and "enfermagem" in c
+                and "1" in c
+                and "mes" in c
+            ):
+                consulta_1m_col = c
+                break
+    
+        if consulta_1m_col:
+            df["c2_a_ok"] = to_bool(df[consulta_1m_col])
     
         # B - Pelo menos 9 consultas
         # Planilha: "Nr. Consultas" -> nr_consultas
