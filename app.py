@@ -592,6 +592,14 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
             df["c3_e_ok"] = parse_count(
                 df["visitas_domiciliares_acs_tacs_gestacao"]
             ).fillna(0).ge(3)
+
+        # J - Pelo menos 1 visita domiciliar no puerpério
+        # Coluna: "Visitas domiciliares (ACS/TACS) Puerpério"
+        if "visitas_domiciliares_acs_tacs_puerperio" in df.columns:
+            df["c3_j_ok"] = parse_count(
+                df["visitas_domiciliares_acs_tacs_puerperio"]
+            ).fillna(0).ge(1)
+            
     
         # F - Vacina dTpa registrada
         # Coluna: "Vacina dTpa"
