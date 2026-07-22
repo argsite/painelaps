@@ -343,6 +343,7 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
     map_first(df, "nome", ["nome", "nome_completo", "cidadao", "usuario", "paciente"])
     map_first(df, "cpf", ["cpf"])
     map_first(df, "cns", ["cns", "cns_cidadao", "cartao_sus"])
+    map_first(df, "data_nascimento", ["data_nascimento", "dt_nascimento", "nascimento", "data_nasc", "data_de_nascimento"])
     map_first(df, "idade", ["idade"])
     map_first(df, "endereco", ["endereco", "logradouro"])
     map_first(df, "equipe", ["equipe", "equipe_area", "equipe_de_area"])
@@ -780,6 +781,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         "nome",
         "cpf",
         "cns",
+        "data_nascimento",
         "idade",
         "faixa_etaria",
         "endereco",
@@ -812,6 +814,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         "nome": "Nome",
         "cpf": "CPF",
         "cns": "CNS",
+        "data_nascimento": "Data nascimento"
         "idade": "Idade",
         "faixa_etaria": "Faixa etária",
         "endereco": "Endereço",
