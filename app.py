@@ -556,32 +556,89 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
         if "esquema_vacinal_completo" in df.columns:
             df["c2_e_ok"] = to_bool(df["esquema_vacinal_completo"])
 
-    
-       
     # C3
     if indicator_code == "C3":
-        if "consulta_inicial_ate_12s" in df.columns:
-            df["c3_a_ok"] = to_bool(df["consulta_inicial_ate_12s"])
-        if "qtd_consultas_prenatal" in df.columns:
-            df["c3_b_ok"] = parse_count(df["qtd_consultas_prenatal"]).fillna(0).ge(7)
-        if "afericoes_pa" in df.columns:
-            df["c3_c_ok"] = parse_count(df["afericoes_pa"]).fillna(0).ge(7)
-        if "qtd_registros_de_peso_altura" in df.columns:
-            df["c3_d_ok"] = parse_count(df["qtd_registros_de_peso_altura"]).fillna(0).ge(7)
-        if "qtd_visitas_domiciliares" in df.columns:
-            df["c3_e_ok"] = parse_count(df["qtd_visitas_domiciliares"]).fillna(0).ge(3)
-        if "dtpa_ok" in df.columns:
-            df["c3_f_ok"] = to_bool(df["dtpa_ok"])
-        if "exames_1t_ok" in df.columns:
-            df["c3_g_ok"] = to_bool(df["exames_1t_ok"])
-        if "exames_3t_ok" in df.columns:
-            df["c3_h_ok"] = to_bool(df["exames_3t_ok"])
-        if "consulta_puerperio_ok" in df.columns:
-            df["c3_i_ok"] = to_bool(df["consulta_puerperio_ok"])
-        if "visita_puerperio_ok" in df.columns:
-            df["c3_j_ok"] = to_bool(df["visita_puerperio_ok"])
-        if "saude_bucal_ok" in df.columns:
-            df["c3_k_ok"] = to_bool(df["saude_bucal_ok"])
+        # A - Consulta inicial até 12 semanas
+        # Coluna: "Consulta de pré-natal até 12 semanas"
+        if "consulta_de_pre_natal_ate_12_semanas" in df.columns:
+            df["c3_a_ok"] = to_bool(df["consulta_de_pre_natal_ate_12_semanas"])
+    
+        # B - Pelo menos 7 consultas de pré-natal
+        # Coluna: "Consulta médica/enfermagem Gestação" (número de consultas)
+        if "consulta_medica_enfermagem_gestacao" in df.columns:
+            df["c3_b_ok"] = parse_count(
+                df["consulta_medica_enfermagem_gestacao"]
+            ).fillna(0).ge(7)
+    
+        # C - Pelo menos 7 aferições de PA
+        # Coluna: "Aferição de pressão arterial"
+        if "afericao_de_pressao_arterial" in df.columns:
+            df["c3_c_ok"] = parse_count(
+                df["afericao_de_pressao_arterial"]
+            ).fillna(0).ge(7)
+    
+        # D - Pelo menos 7 registros simultâneos de peso/altura
+        # Coluna: "Registro de peso/altura"
+        if "registro_de_peso_altura" in df.columns:
+            df["c3_d_ok"] = parse_count(
+                df["registro_de_peso_altura"]
+            ).fillna(0).ge(7)
+    
+        # E - Pelo menos 3 visitas domiciliares na gestação
+        # Coluna: "Visitas domiciliares (ACS/TACS) Gestação"
+        if "visitas_domiciliares_acs_tacs_gestacao" in df.columns:
+            df["c3_e_ok"] = parse_count(
+                df["visitas_domiciliares_acs_tacs_gestacao"]
+            ).fillna(0).ge(3)
+    
+        # F - Vacina dTpa registrada
+        # Coluna: "Vacina dTpa"
+        if "vacina_dtpa" in df.columns:
+            df["c3_f_ok"] = to_bool(df["vacina_dtpa"])
+    
+        # G - Exames 1º trimestre (sífilis, HIV, hepatites B e C)
+        # Usar todas as colunas de testes do 1º trimestre combinadas
+        cols_1t = [
+            "teste_rapido_sifilis_primeiro_trimestre",
+            "teste_rapido_hiv_primeiro_trimestre",
+            "teste_rapido_hepatite_b_primeiro_trimestre",
+            "teste_rapido_hepatite_c_primeiro_trimestre",
+        ]
+        present_1t = [c for c in cols_1t if c in df.columns]
+        if present_1t:
+            temp = pd.Series(False, index=df.index)
+            for c in present_1t:
+                temp = temp | to_bool(df[c])
+            df["c3_g_ok"] = temp
+    
+        # H - Exames 3º trimestre (sífilis e HIV)
+        cols_3t = [
+            "teste_rapido_sifilis_terceiro_trimestre",
+            "teste_rapido_hiv_terceiro_trimestre",
+        ]
+        present_3t = [c for c in cols_3t if c in df.columns]
+        if present_3t:
+            temp = pd.Series(False, index=df.index)
+            for c in present_3t:
+                temp = temp | to_bool(df[c])
+            df["c3_h_ok"] = temp
+    
+        # I - Consulta médica/enfermagem no puerpério
+        if "consulta_medica_enfermagem_puerperio" in df.columns:
+            df["c3_i_ok"] = to_bool(df["consulta_medica_enfermagem_puerperio"])
+    
+        # J - Pelo menos 1 visita domiciliar no puerpério
+        if "visitas_domiciliares_acs_tacs_puerperio" in df.columns:
+            df["c3_j_ok"] = parse_count(
+                df["visitas_domiciliares_acs_tacs_puerperio"]
+            ).fillna(0).ge(1)
+    
+        # K - Pelo menos 1 atividade em saúde bucal na gestação
+        if "avaliacao_odontologica_gestacao" in df.columns:
+            df["c3_k_ok"] = to_bool(df["avaliacao_odontologica_gestacao"])
+
+         
+    
 
     # C4
     if indicator_code == "C4":
