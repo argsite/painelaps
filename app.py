@@ -1061,7 +1061,13 @@ def render_c7_age_dashboard(df: pd.DataFrame):
             subset = df.iloc[0:0].copy()
         elegiveis = len(subset)
         positivos = int(to_bool(subset[col]).sum()) if col in subset.columns else 0
-        age_rows.append({"Faixa etária": label, "Elegíveis": elegiveis, "Boas práticas positivas": positivos})
+        age_rows.append(
+            {
+                "Faixa etária": label,
+                "Elegíveis": elegiveis,
+                "Boas práticas positivas": positivos,
+            }
+        )
 
     age_df = pd.DataFrame(age_rows)
     fig = px.bar(
@@ -1075,15 +1081,6 @@ def render_c7_age_dashboard(df: pd.DataFrame):
     fig.update_layout(xaxis_title="Faixa etária", yaxis_title="Quantidade")
     st.plotly_chart(fig, use_container_width=True)
 
-    # Mostrar algumas linhas com as duas colunas lado a lado
-    cols = []
-    if has_raw:
-        cols.append("consulta_medica_enfermagem_1_mes")
-    if has_c2a:
-        cols.append("c2_a_ok")
-    if cols:
-        st.write("Amostra das colunas de consulta e c2_a_ok:")
-        st.dataframe(df[cols].head())
 
 
 def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
