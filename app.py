@@ -1042,19 +1042,19 @@ def main():
 
     df_filtered, pend_label = apply_global_filters(df, spec)
 
-team_display = None
-if "equipe" in df_filtered.columns:
-    vals = [str(v).strip() for v in df_filtered["equipe"].dropna().astype(str) if str(v).strip()]
-    uniq = sorted(set(vals))
-    if len(uniq) == 1:
-        team_display = uniq[0]
-    elif len(uniq) > 1:
-        team_display = " / ".join(uniq)
-
-if team_display:
-    st.success(f"Equipe em análise: {team_display}")
-else:
-    st.success("Equipe em análise: não identificada")
+    team_display = None
+    if "equipe" in df_filtered.columns:
+        vals = [str(v).strip() for v in df_filtered["equipe"].dropna().astype(str) if str(v).strip()]
+        uniq = sorted(set(vals))
+        if len(uniq) == 1:
+            team_display = uniq[0]
+        elif len(uniq) > 1:
+            team_display = " / ".join(uniq)
+    
+    if team_display:
+        st.success(f"Equipe em análise: {team_display}")
+    else:
+        st.success("Equipe em análise: não identificada")
     
     st.markdown(f"## {spec.code} - {spec.name}")
     st.write(spec.description)
