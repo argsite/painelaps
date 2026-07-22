@@ -667,7 +667,6 @@ def apply_global_filters(df: pd.DataFrame, spec: IndicatorSpec) -> Tuple[pd.Data
         ma_sel = st.multiselect("Por microárea", microareas)
         fx_sel = st.multiselect("Por faixa etária", faixas)
 
-   
     out = df.copy()
     if eq_sel:
         out = out[out["equipe"].astype(str).isin(eq_sel)]
@@ -676,8 +675,7 @@ def apply_global_filters(df: pd.DataFrame, spec: IndicatorSpec) -> Tuple[pd.Data
     if fx_sel:
         out = out[out["faixa_etaria"].astype(str).isin(fx_sel)]
 
-    selected_label = pend_sel if pend_sel != "Todos" else None
-    return out, selected_label
+    return out, None
 
 # =========================
 # Renderização
@@ -1021,7 +1019,7 @@ def main():
     spec = INDICATORS[selected_code]
     df = preprocess_df(df_raw, selected_code)
 
-    df_filtered, pend_label = apply_global_filters(df, spec)
+    df_filtered, _ = apply_global_filters(df, spec)
 
     team_display = None
     if "equipe" in df_filtered.columns:
