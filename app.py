@@ -991,6 +991,8 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     for l in letters
     ]
 
+    tabs = st.tabs(tab_labels)
+
     with tabs[0]:
         st.dataframe(df_display, use_container_width=True, height=420)
         st.caption(f"Total de pacientes exibidos: {len(df_display)}")
