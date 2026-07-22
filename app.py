@@ -522,16 +522,32 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
 
     # C2
     if indicator_code == "C2":
-        if "consulta_ate_30_dias" in df.columns:
-            df["c2_a_ok"] = to_bool(df["consulta_ate_30_dias"])
-        if "qtd_consultas" in df.columns:
-            df["c2_b_ok"] = parse_count(df["qtd_consultas"]).fillna(0).ge(9)
-        if "qtd_registros_de_peso_altura" in df.columns:
-            df["c2_c_ok"] = parse_count(df["qtd_registros_de_peso_altura"]).fillna(0).ge(9)
-        if "visita_oportuna" in df.columns:
-            df["c2_d_ok"] = to_bool(df["visita_oportuna"])
-        if "vacina_em_dia" in df.columns:
-            df["c2_e_ok"] = to_bool(df["vacina_em_dia"])
+    # A - 1ª consulta até 30 dias
+    # Planilha: "Consulta médica/enfermagem 1º mês" -> consulta_medica_enfermagem_1_mes
+    if "consulta_medica_enfermagem_1_mes" in df.columns:
+        df["c2_a_ok"] = to_bool(df["consulta_medica_enfermagem_1_mes"])
+
+    # B - Pelo menos 9 consultas
+    # Planilha: "Nr. Consultas" -> nr_consultas
+    if "nr_consultas" in df.columns:
+        df["c2_b_ok"] = parse_count(df["nr_consultas"]).fillna(0).ge(9)
+
+    # C - Pelo menos 9 registros de peso/altura (já está correto)
+    if "qtd_registros_de_peso_altura" in df.columns:
+        df["c2_c_ok"] = parse_count(df["qtd_registros_de_peso_altura"]).fillna(0).ge(9)
+
+    # D - 2 visitas domiciliares (1º e 6º mês)
+    # Planilha: "Visita Domiciliar 1º mês" -> visita_domiciliar_1_mes
+    #          "Visita Domiciliar 6º mês" -> visita_domiciliar_6_mes
+    if "visita_domiciliar_1_mes" in df.columns and "visita_domiciliar_6_mes" in df.columns:
+        v1 = to_bool(df["visita_domiciliar_1_mes"])
+        v6 = to_bool(df["visita_domiciliar_6_mes"])
+        df["c2_d_ok"] = v1 & v6
+
+    # E - Esquema vacinal completo
+    # Planilha: "Esquema vacinal completo" -> esquema_vacinal_completo
+    if "esquema_vacinal_completo" in df.columns:
+        df["c2_e_ok"] = to_bool(df["esquema_vacinal_completo"])
 
     # C3
     if indicator_code == "C3":
