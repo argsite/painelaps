@@ -814,7 +814,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         "nome": "Nome",
         "cpf": "CPF",
         "cns": "CNS",
-        "data_nascimento": "Data nascimento"
+        "data_nascimento": "Data nascimento",
         "idade": "Idade",
         "faixa_etaria": "Faixa etária",
         "endereco": "Endereço",
