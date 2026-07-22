@@ -937,7 +937,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         st.download_button(
             "Baixar CSV filtrado",
             data=csv_bytes,
-            file_name=f"lista_nominal_{friendly_indicator_name(spec)}_{friendly_pendencia_name(letra)}_{friendly_team_name(df)}.csv",
+            file_name=f"lista_nominal_{friendly_indicator_name(spec)}_{friendly_team_name(df)}.csv",
             mime="text/csv",
             key=f"{spec.code}_csv_all",
         )
@@ -945,7 +945,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         st.download_button(
             "Baixar Excel filtrado",
             data=export_excel_bytes(df_display),
-            file_name=f"lista_nominal_{friendly_indicator_name(spec)}_{friendly_pendencia_name(letra)}_{friendly_team_name(df)}.xlsx",
+            file_name=f"lista_nominal_{friendly_indicator_name(spec)}_{friendly_team_name(df)}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"{spec.code}_xlsx_all",
         )
@@ -974,7 +974,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
             st.download_button(
                 "Baixar CSV filtrado",
                 data=csv_bytes,
-                file_name=f"{spec.code.lower()}_pendencia_{letra}.csv",
+                file_name=f"lista_nominal_{friendly_indicator_name(spec)}_{friendly_pendencia_name(letra)}_{friendly_team_name(df)}.csv",
                 mime="text/csv",
                 key=f"{spec.code}_csv_{letra}",
             )
@@ -982,7 +982,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
             st.download_button(
                 "Baixar Excel filtrado",
                 data=export_excel_bytes(filtered_display),
-                file_name=f"{spec.code.lower()}_pendencia_{letra}.xlsx",
+                file_name=f"lista_nominal_{friendly_indicator_name(spec)}_{friendly_pendencia_name(letra)}_{friendly_team_name(df)}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"{spec.code}_xlsx_{letra}",
             )
