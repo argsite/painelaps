@@ -714,46 +714,6 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
         df["c7_d_ok"] = df["c7_d_ok"] & df["c7_d_applicable"]
 
     return df
-#teste debug
-def debug_c2_d(df):
-    st.markdown("### Debug C2 - D (visitas domiciliares)")
-
-    cols = list(df.columns)
-    st.write("Colunas atuais:", cols)
-
-    has_v1 = "visita_domiciliar_1_mes" in df.columns
-    has_v6 = "visita_domiciliar_6_mes" in df.columns
-    st.write("visita_domiciliar_1_mes presente?", has_v1)
-    st.write("visita_domiciliar_6_mes presente?", has_v6)
-
-    if has_v1:
-        st.write(
-            "Valores únicos em visita_domiciliar_1_mes:",
-            df["visita_domiciliar_1_mes"].astype(str).unique(),
-        )
-    if has_v6:
-        st.write(
-            "Valores únicos em visita_domiciliar_6_mes:",
-            df["visita_domiciliar_6_mes"].astype(str).unique(),
-        )
-
-    has_c2d = "c2_d_ok" in df.columns
-    st.write("c2_d_ok presente?", has_c2d)
-    if has_c2d:
-        st.write("Valores únicos em c2_d_ok:", df["c2_d_ok"].astype(str).unique())
-        serie = df["c2_d_ok"].astype(str).str.strip().str.lower()
-        count_true = int(
-            serie.isin(["true", "1", "sim", "s", "x", "ok", "yes"]).sum()
-        )
-        st.write("Contagem de c2_d_ok marcados como realizados:", count_true)
-
-    show_cols = []
-    for c in ["nome", "visita_domiciliar_1_mes", "visita_domiciliar_6_mes", "c2_d_ok"]:
-        if c in df.columns:
-            show_cols.append(c)
-    if show_cols:
-        st.write("Amostra das colunas de visitas e C2 - D:")
-        st.dataframe(df[show_cols].head())
 
 def preprocess_c2_visits(df: pd.DataFrame) -> pd.DataFrame:
     # Garantir que colunas de visita domiciliar do C2 existam com nomes padrão
@@ -1449,8 +1409,6 @@ def main():
     df = preprocess_df(df_raw, selected_code)
 
     df_filtered, _ = apply_global_filters(df, spec)
-    if selected_code == "C2":
-        debug_c2_d(df_filtered)
 
     team_display = None
     if "equipe" in df_filtered.columns:
