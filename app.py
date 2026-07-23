@@ -752,6 +752,32 @@ def preprocess_c2_visits(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+def preprocess_c3_puerperio_visits(df: pd.DataFrame) -> pd.DataFrame:
+    """Garantir coluna padronizada para visitas domiciliares no puerpério (C3 - J).
+
+    Depois de normalize_col, vamos procurar qualquer coluna que pareça
+    "visitas domiciliares (ACS/TACS) Puerpério" e copiar para
+    "visitas_domiciliares_acs_tacs_puerperio" se ainda não existir.
+    """
+
+    cols = list(df.columns)
+
+    # Candidatos: nome contendo "visita", "domiciliar", "acs"/"tacs" e "puerperio"
+    candidates = [
+        c
+        for c in cols
+        if "visita" in c
+        and "domiciliar" in c
+        and ("acs" in c or "tacs" in c)
+        and "puerperio" in c
+    ]
+
+    if candidates and "visitas_domiciliares_acs_tacs_puerperio" not in df.columns:
+        src = candidates[0]
+        df["visitas_domiciliares_acs_tacs_puerperio"] = df[src]
+
+    return df
+
 
 
 # =========================
