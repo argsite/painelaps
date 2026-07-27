@@ -134,10 +134,10 @@ def friendly_pendencia_name(letra: str) -> str:
     return slugify_filename(f"pendencia_{letra}")
 
 def friendly_team_name(df: pd.DataFrame) -> str:
-    if "equipe_vinculo" in df.columns and df["equipe_vinculo"].notna().any():
+    if "equipe_area" in df.columns and df["equipe_area"].notna().any():
         teams = sorted({
             clean_team_name(v)
-            for v in df["equipe_vinculo"].dropna().astype(str)
+            for v in df["equipe_area"].dropna().astype(str)
             if clean_team_name(v)
         })
         if len(teams) == 1:
@@ -156,7 +156,20 @@ def friendly_team_name(df: pd.DataFrame) -> str:
         if len(teams) > 1:
             return slugify_filename("_".join(teams))
 
+    if "equipe_vinculo" in df.columns and df["equipe_vinculo"].notna().any():
+        teams = sorted({
+            clean_team_name(v)
+            for v in df["equipe_vinculo"].dropna().astype(str)
+            if clean_team_name(v)
+        })
+        if len(teams) == 1:
+            return slugify_filename(teams[0])
+        if len(teams) > 1:
+            return slugify_filename("_".join(teams))
+
     return "todas_as_equipes"
+
+
 
 TAB_SHORT_LABELS = {
     "C2": {
@@ -941,10 +954,21 @@ def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
     )
 
     team_display = "não identificada"
-    if "equipe_vinculo" in df.columns and df["equipe_vinculo"].notna().any():
+    if "equipe_area" in df.columns and df["equipe_area"].notna().any():
         vals = [
             clean_team_name(v)
-            for v in df["equipe_vinculo"].dropna().astype(str)
+            for v in df["equipe_area"].dropna().astype(str)
+            if clean_team_name(v)
+        ]
+        uniq = sorted(set(vals))
+        if len(uniq) == 1:
+            team_display = uniq[0]
+        elif len(uniq) > 1:
+            team_display = " / ".join(uniq)
+    elif "equipe" in df.columns and df["equipe"].notna().any():
+        vals = [
+            clean_team_name(v)
+            for v in df["equipe"].dropna().astype(str)
             if clean_team_name(v)
         ]
         uniq = sorted(set(vals))
