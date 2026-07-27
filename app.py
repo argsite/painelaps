@@ -971,8 +971,6 @@ def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
         key=f"{spec.code}_boas_praticas_xlsx",
     )
 
-from openpyxl.utils import get_column_letter
-
 def export_excel_bytes(df: pd.DataFrame, title: Optional[str] = None) -> bytes:
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
