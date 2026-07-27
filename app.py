@@ -954,28 +954,20 @@ def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
     )
 
     team_display = "não identificada"
+
     if "equipe_area" in df.columns and df["equipe_area"].notna().any():
-        vals = [
-            clean_team_name(v)
-            for v in df["equipe_area"].dropna().astype(str)
-            if clean_team_name(v)
-        ]
-        uniq = sorted(set(vals))
-        if len(uniq) == 1:
-            team_display = uniq[0]
-        elif len(uniq) > 1:
-            team_display = " / ".join(uniq)
+        teams = df["equipe_area"].astype(str).map(clean_team_name)
+        teams = teams[teams != ""]
+        if not teams.empty:
+            team_display = teams.value_counts().idxmax()
+    
     elif "equipe" in df.columns and df["equipe"].notna().any():
-        vals = [
-            clean_team_name(v)
-            for v in df["equipe"].dropna().astype(str)
-            if clean_team_name(v)
-        ]
-        uniq = sorted(set(vals))
-        if len(uniq) == 1:
-            team_display = uniq[0]
-        elif len(uniq) > 1:
-            team_display = " / ".join(uniq)
+        teams = df["equipe"].astype(str).map(clean_team_name)
+        teams = teams[teams != ""]
+        if not teams.empty:
+            team_display = teams.value_counts().idxmax()
+
+
 
     data_exportacao = datetime.now().strftime("%d/%m/%Y")
     titulo_export = f"Cumprimento das boas práticas - {team_display} - {data_exportacao}"
@@ -1553,28 +1545,28 @@ def main():
     df_filtered, _ = apply_global_filters(df, spec)
 
     team_display = None
+
     if "equipe_area" in df_filtered.columns and df_filtered["equipe_area"].notna().any():
-        vals = [
-            clean_team_name(v)
-            for v in df_filtered["equipe_area"].dropna().astype(str)
-            if clean_team_name(v)
-        ]
-        uniq = sorted(set(vals))
-        if len(uniq) == 1:
-            team_display = uniq[0]
-        elif len(uniq) > 1:
-            team_display = " / ".join(uniq)
+        teams = (
+            df_filtered["equipe_area"]
+            .astype(str)
+            .map(clean_team_name)
+        )
+        teams = teams[teams != ""]
+    
+        if not teams.empty:
+            team_display = teams.value_counts().idxmax()
+    
     elif "equipe" in df_filtered.columns and df_filtered["equipe"].notna().any():
-        vals = [
-            clean_team_name(v)
-            for v in df_filtered["equipe"].dropna().astype(str)
-            if clean_team_name(v)
-        ]
-        uniq = sorted(set(vals))
-        if len(uniq) == 1:
-            team_display = uniq[0]
-        elif len(uniq) > 1:
-            team_display = " / ".join(uniq)
+        teams = (
+            df_filtered["equipe"]
+            .astype(str)
+            .map(clean_team_name)
+        )
+        teams = teams[teams != ""]
+    
+        if not teams.empty:
+            team_display = teams.value_counts().idxmax()
     
     if team_display:
         st.success(f"Equipe em análise: {team_display}")
