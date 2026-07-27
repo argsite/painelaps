@@ -119,6 +119,13 @@ def slugify_filename(text: str) -> str:
     text = re.sub(r"_+", "_", text).strip("_")
     return text or "arquivo"
 
+def clean_team_name(value: str) -> str:
+    text = str(value).strip()
+    if not text:
+        return ""
+    text = re.sub(r"^\s*\d+\s*[-–—]\s*", "", text)
+    return text.strip()
+
 def friendly_indicator_name(spec: IndicatorSpec) -> str:
     return slugify_filename(spec.name)
 
@@ -126,18 +133,28 @@ def friendly_pendencia_name(letra: str) -> str:
     return slugify_filename(f"pendencia_{letra}")
 
 def friendly_team_name(df: pd.DataFrame) -> str:
-    if "equipe" in df.columns and df["equipe"].notna().any():
-        teams = sorted({str(v).strip() for v in df["equipe"].dropna().astype(str) if str(v).strip()})
-        if len(teams) == 1:
-            return slugify_filename(teams[0])
-        if len(teams) > 1:
-            return slugify_filename("_".join(teams))
     if "equipe_vinculo" in df.columns and df["equipe_vinculo"].notna().any():
-        teams = sorted({str(v).strip() for v in df["equipe_vinculo"].dropna().astype(str) if str(v).strip()})
+        teams = sorted({
+            clean_team_name(v)
+            for v in df["equipe_vinculo"].dropna().astype(str)
+            if clean_team_name(v)
+        })
         if len(teams) == 1:
             return slugify_filename(teams[0])
         if len(teams) > 1:
             return slugify_filename("_".join(teams))
+
+    if "equipe" in df.columns and df["equipe"].notna().any():
+        teams = sorted({
+            clean_team_name(v)
+            for v in df["equipe"].dropna().astype(str)
+            if clean_team_name(v)
+        })
+        if len(teams) == 1:
+            return slugify_filename(teams[0])
+        if len(teams) > 1:
+            return slugify_filename("_".join(teams))
+
     return "todas_as_equipes"
 
 TAB_SHORT_LABELS = {
@@ -925,9 +942,9 @@ def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
     team_display = "não identificada"
     if "equipe_vinculo" in df.columns and df["equipe_vinculo"].notna().any():
         vals = [
-            str(v).strip()
+            clean_team_name(v)
             for v in df["equipe_vinculo"].dropna().astype(str)
-            if str(v).strip()
+            if clean_team_name(v)
         ]
         uniq = sorted(set(vals))
         if len(uniq) == 1:
@@ -1493,7 +1510,11 @@ def main():
 
     team_display = None
     if "equipe_vinculo" in df_filtered.columns:
-        vals = [str(v).strip() for v in df_filtered["equipe_vinculo"].dropna().astype(str) if str(v).strip()]
+        vals = [
+            clean_team_name(v)
+            for v in df_filtered["equipe_vinculo"].dropna().astype(str)
+            if clean_team_name(v)
+        ]
         uniq = sorted(set(vals))
         if len(uniq) == 1:
             team_display = uniq[0]
