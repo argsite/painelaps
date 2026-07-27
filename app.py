@@ -422,7 +422,7 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
     map_first(df, "data_nascimento", ["data_nascimento", "dt_nascimento", "nascimento", "data_nasc", "data_de_nascimento"])
     map_first(df, "idade", ["idade"])
     map_first(df, "endereco", ["endereco", "logradouro"])
-    map_first(df, "equipe", ["equipe_area", "equipe", "equipe_vinculo", "equipe_de_area"])
+    map_first(df, "equipe", ["equipe_vinculo", "equipe_area", "equipe", "equipe_de_area"])
     map_first(df, "micro_area", ["micro_area", "microarea"])
     map_first(df, "equipe_vinculo", ["equipe_vinculo", "equipe_de_vinculo"])
     map_first(df, "cadastro_atualizado", ["cadastro_atualizado"])
