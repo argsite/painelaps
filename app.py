@@ -939,7 +939,7 @@ def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
     titulo_export = f"Cumprimento das boas práticas - {team_display} - {data_exportacao}"
 
     st.download_button(
-        "Baixar Excel das boas práticas",
+        "Baixar Relatório das Boas Práticas",
         data=export_excel_bytes(
             bp_df[["Boa prática", "Peso", "Realizados", "% Realizado", "Não realizado"]],
             title=titulo_export,
