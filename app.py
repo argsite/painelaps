@@ -3,6 +3,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -912,11 +913,44 @@ def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
 
     bp_df_display = bp_df.copy()
     if "% Realizado" in bp_df_display.columns:
-        bp_df_display["% Realizado"] = bp_df_display["% Realizado"].map(lambda v: f"{v:.1f}%" if pd.notna(v) else "")
+        bp_df_display["% Realizado"] = bp_df_display["% Realizado"].map(
+            lambda v: f"{v:.1f}%" if pd.notna(v) else ""
+        )
 
     st.dataframe(
         bp_df_display[["Boa prática", "Peso", "Realizados", "% Realizado", "Não realizado"]],
         use_container_width=True,
+    )
+
+    team_display = "não identificada"
+    if "equipe_vinculo" in df.columns and df["equipe_vinculo"].notna().any():
+        vals = [
+            str(v).strip()
+            for v in df["equipe_vinculo"].dropna().astype(str)
+            if str(v).strip()
+        ]
+        uniq = sorted(set(vals))
+        if len(uniq) == 1:
+            team_display = uniq[0]
+        elif len(uniq) > 1:
+            team_display = " / ".join(uniq)
+
+    data_exportacao = datetime.now().strftime("%d/%m/%Y")
+    titulo_export = f"Cumprimento das boas práticas - {team_display} - {data_exportacao}"
+
+    st.download_button(
+        "Baixar Excel das boas práticas",
+        data=export_excel_bytes(
+            bp_df[["Boa prática", "Peso", "Realizados", "% Realizado", "Não realizado"]],
+            title=titulo_export,
+        ),
+        file_name=(
+            f"cumprimento_boas_praticas_"
+            f"{friendly_indicator_name(spec)}_"
+            f"{friendly_team_name(df)}.xlsx"
+        ),
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key=f"{spec.code}_boas_praticas_xlsx",
     )
 
 
