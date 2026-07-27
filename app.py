@@ -725,35 +725,55 @@ def preprocess_c2_visits(df: pd.DataFrame) -> pd.DataFrame:
 
     cols = list(df.columns)
 
-    # Candidatos para "visita domiciliar 1º mês"
-    v1_candidates = [
-        c
-        for c in cols
-        if "visita" in c
-        and "domiciliar" in c
-        and "1" in c
-        and "mes" in c
-    ]
+    def is_c2_visit_1m(col: str) -> bool:
+        return (
+            "visita" in col
+            and "domiciliar" in col
+            and "mes" in col
+            and (
+                "1_mes" in col
+                or "1o_mes" in col
+                or "1_mes_de_vida" in col
+                or "primeiro_mes" in col
+            )
+        )
 
-    # Candidatos para "visita domiciliar 6º mês"
-    v6_candidates = [
-        c
-        for c in cols
-        if "visita" in c
-        and "domiciliar" in c
-        and "6" in c
-        and "mes" in c
-    ]
+    def is_c2_visit_6m(col: str) -> bool:
+        return (
+            "visita" in col
+            and "domiciliar" in col
+            and "mes" in col
+            and (
+                "6_mes" in col
+                or "6o_mes" in col
+                or "6_mes_de_vida" in col
+                or "sexto_mes" in col
+            )
+        )
+
+    v1_candidates = [c for c in cols if is_c2_visit_1m(c)]
+    v6_candidates = [c for c in cols if is_c2_visit_6m(c)]
+
+    if not v1_candidates:
+        v1_candidates = [
+            c for c in cols
+            if "visita" in c and "domiciliar" in c and "1" in c and "mes" in c
+        ]
+
+    if not v6_candidates:
+        v6_candidates = [
+            c for c in cols
+            if "visita" in c and "domiciliar" in c and "6" in c and "mes" in c
+        ]
 
     if v1_candidates and "visita_domiciliar_1_mes" not in df.columns:
-        src = v1_candidates[0]
-        df["visita_domiciliar_1_mes"] = df[src]
+        df["visita_domiciliar_1_mes"] = df[v1_candidates[0]]
 
     if v6_candidates and "visita_domiciliar_6_mes" not in df.columns:
-        src = v6_candidates[0]
-        df["visita_domiciliar_6_mes"] = df[src]
+        df["visita_domiciliar_6_mes"] = df[v6_candidates[0]]
 
     return df
+
 
 def preprocess_c3_puerperio_visits(df: pd.DataFrame) -> pd.DataFrame:
     """Garantir coluna padronizada para visitas domiciliares no puerpério (C3 - J).
