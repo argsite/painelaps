@@ -1553,10 +1553,21 @@ def main():
     df_filtered, _ = apply_global_filters(df, spec)
 
     team_display = None
-    if "equipe_vinculo" in df_filtered.columns:
+    if "equipe_area" in df_filtered.columns and df_filtered["equipe_area"].notna().any():
         vals = [
             clean_team_name(v)
-            for v in df_filtered["equipe_vinculo"].dropna().astype(str)
+            for v in df_filtered["equipe_area"].dropna().astype(str)
+            if clean_team_name(v)
+        ]
+        uniq = sorted(set(vals))
+        if len(uniq) == 1:
+            team_display = uniq[0]
+        elif len(uniq) > 1:
+            team_display = " / ".join(uniq)
+    elif "equipe" in df_filtered.columns and df_filtered["equipe"].notna().any():
+        vals = [
+            clean_team_name(v)
+            for v in df_filtered["equipe"].dropna().astype(str)
             if clean_team_name(v)
         ]
         uniq = sorted(set(vals))
