@@ -970,15 +970,36 @@ def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
         key=f"{spec.code}_boas_praticas_xlsx",
     )
 
+from openpyxl.utils import get_column_letter
 
 def export_excel_bytes(df: pd.DataFrame, title: Optional[str] = None) -> bytes:
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         startrow = 0
         if title:
-            pd.DataFrame([[title]]).to_excel(writer, index=False, header=False, sheet_name="dados", startrow=0)
+            pd.DataFrame([[title]]).to_excel(
+                writer,
+                index=False,
+                header=False,
+                sheet_name="dados",
+                startrow=0
+            )
             startrow = 2
+
         df.to_excel(writer, index=False, sheet_name="dados", startrow=startrow)
+
+        ws = writer.sheets["dados"]
+
+        for idx, col_name in enumerate(df.columns, start=1):
+            col_letter = get_column_letter(idx)
+            max_len = len(str(col_name))
+
+            for value in df[col_name].astype(str).fillna(""):
+                max_len = max(max_len, len(value))
+
+            adjusted_width = min(max_len + 2, 60)
+            ws.column_dimensions[col_letter].width = adjusted_width
+
     buffer.seek(0)
     return buffer.read()
 
