@@ -1532,7 +1532,11 @@ def main():
 
     team_display = None
     if "equipe_vinculo" in df_filtered.columns:
-        vals = [str(v).strip() for v in df_filtered["equipe_vinculo"].dropna().astype(str) if str(v).strip()]
+        vals = [
+            clean_team_name(v)
+            for v in df_filtered["equipe_vinculo"].dropna().astype(str)
+            if clean_team_name(v)
+        ]
         uniq = sorted(set(vals))
         if len(uniq) == 1:
             team_display = uniq[0]
