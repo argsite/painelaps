@@ -1,0 +1,15 @@
+streamlit==1.41.1
+streamlit-extras
+streamlit-aggrid
+pandas
+plotly
+openpyxl
+folium
+streamlit-folium
+geopy
+xlrd
+numpy
+requests
+pydeck
+fastkml
+shapely
