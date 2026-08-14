@@ -1,8 +1,0 @@
-streamlit==1.41.1
-pandas
-plotly
-openpyxl
-folium
-streamlit-folium
-geopy
-xlrd
