@@ -2249,9 +2249,9 @@ def render_geocoded_map(
             )
 
             tooltip_texto = (
-                f"👤 {nome}<br>"
-                f"🎂 Idade: {idade_texto}<br>"
-                f"📍 {endereco}"
+                f" {nome}<br>"
+                f" Idade: {idade_texto}<br>"
+                f" {endereco}"
             )
 
             popup_html = f"""
